@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",  # refresh-token rotation + logout need it
     "drf_spectacular",
     # local
     "apps.core",
@@ -104,7 +105,30 @@ REST_FRAMEWORK = {
     # so they go over the wire as JSON numbers, not strings.
     "COERCE_DECIMAL_TO_STRING": False,
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    # Views opt in with throttle_classes = [ScopedRateThrottle] + throttle_scope. Rates are per client IP;
+    # many users share one IP (mobile carrier NAT), so they are generous. The tight per-phone limits live
+    # in apps.accounts.otp.service.
+    "DEFAULT_THROTTLE_RATES": {
+        "otp_send": env("THROTTLE_OTP_SEND", default="30/hour"),
+        "otp_verify": env("THROTTLE_OTP_VERIFY", default="60/hour"),
+        "token": env("THROTTLE_TOKEN", default="60/minute"),
+    },
 }
+
+# DRF throttles live in the cache. LocMem is per-process (fine for dev); prod.py switches to a
+# database cache so limits are shared between worker processes (run `createcachetable` once).
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
+# --- OTP (phone + one-time-code login) ---------------------------------------------------------------
+# Delivery is pluggable: a class with send(target=, code=, purpose=). Dev prints the code to the server
+# log; a real SMS/email provider is a new class + this setting.
+OTP_BACKEND = env("OTP_BACKEND", default="apps.accounts.otp.backends.ConsoleOTPBackend")
+OTP_LENGTH = 6
+OTP_TTL_SECONDS = env.int("OTP_TTL_SECONDS", default=300)
+OTP_MAX_ATTEMPTS = env.int("OTP_MAX_ATTEMPTS", default=5)
+OTP_RESEND_COOLDOWN_SECONDS = env.int("OTP_RESEND_COOLDOWN_SECONDS", default=60)
+OTP_MAX_RESENDS = env.int("OTP_MAX_RESENDS", default=3)
+OTP_MAX_REQUESTS_PER_TARGET_PER_HOUR = env.int("OTP_MAX_REQUESTS_PER_TARGET_PER_HOUR", default=5)
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env.int("JWT_ACCESS_MINUTES", default=15)),

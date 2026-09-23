@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 
@@ -47,3 +48,36 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.email = self.email.strip().lower() if self.email else None
         self.username = self.username.strip() if self.username else None
         super().save(*args, **kwargs)
+
+
+class OTPRequest(models.Model):
+    """One pending one-time code. The raw token and code are never stored, only hashes.
+
+    `token` (opaque, URL-safe) is what the frontend holds between "send OTP" and "verify OTP".
+    """
+
+    class Purpose(models.TextChoices):
+        REGISTER = "register", "Register"
+        LOGIN = "login", "Login"
+        PROFILE_PHONE = "profile_phone", "Change phone number"
+        PROFILE_EMAIL = "profile_email", "Change email"
+
+    token_hash = models.CharField(max_length=64, unique=True)
+    purpose = models.CharField(max_length=20, choices=Purpose.choices)
+    target = models.CharField(max_length=254)  # the phone number or email the code was sent to
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="otp_requests"
+    )
+    code_hash = models.CharField(max_length=64)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    resend_count = models.PositiveSmallIntegerField(default=0)
+    last_sent_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["target", "purpose", "created_at"])]
+
+    def __str__(self):
+        return f"{self.purpose} -> {self.target}"

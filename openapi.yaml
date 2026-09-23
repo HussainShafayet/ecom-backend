@@ -5,6 +5,337 @@ info:
   description: REST API for the GoCart storefront. Every response uses the `{success,
     message, data | errors}` envelope described in docs/API_CONTRACT.md.
 paths:
+  /api/v1/accounts/login/:
+    post:
+      operationId: accounts_login_create
+      description: |-
+        Auth endpoints are open to guests. `authentication_classes = []` also means an expired or
+        garbage Authorization header (the frontend sends its stale access token to refresh/logout)
+        is ignored instead of causing a 401 before the view runs.
+      summary: 'Start a login: send an OTP to an existing account'
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OTPSent'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/logout/:
+    post:
+      operationId: accounts_logout_create
+      description: |-
+        Auth endpoints are open to guests. `authentication_classes = []` also means an expired or
+        garbage Authorization header (the frontend sends its stale access token to refresh/logout)
+        is ignored instead of causing a 401 before the view runs.
+      summary: Revoke the refresh token
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      security:
+      - {}
+      responses:
+        '200':
+          description: Logged out (idempotent).
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    nullable: true
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/register/:
+    post:
+      operationId: accounts_register_create
+      description: |-
+        Auth endpoints are open to guests. `authentication_classes = []` also means an expired or
+        garbage Authorization header (the frontend sends its stale access token to refresh/logout)
+        is ignored instead of causing a 401 before the view runs.
+      summary: Register with a phone number and send an OTP
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OTPSent'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/resend-otp/:
+    post:
+      operationId: accounts_resend_otp_create
+      description: Same token, new code. Cooldown between sends (429) and a maximum
+        number of resends (400).
+      summary: Send a fresh OTP for an existing token
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendOTPRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResendOTPRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ResendOTPRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          description: A new OTP has been sent.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    nullable: true
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/token/refresh/:
+    post:
+      operationId: accounts_token_refresh_create
+      description: 'Returns a new `access` AND a new `refresh` (the old one is blacklisted).
+        The frontend stores both. Invalid/expired/blacklisted refresh: 401.'
+      summary: Rotate the refresh token
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/Tokens'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/verify-otp/:
+    post:
+      operationId: accounts_verify_otp_create
+      description: Also accepts the guest's `cart` and `favorite` lists (merged by
+        the shop apps).
+      summary: Verify the OTP and receive the JWT pair
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOTPRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VerifyOTPRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VerifyOTPRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/SignIn'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/health/:
     get:
       operationId: health_retrieve
@@ -56,6 +387,113 @@ components:
       required:
       - database
       - status
+    LoginRequest:
+      type: object
+      properties:
+        phone_number:
+          type: string
+          minLength: 1
+          pattern: ^\+880\d{10}$
+          maxLength: 14
+      required:
+      - phone_number
+    LogoutRequest:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+    OTPSent:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Opaque URL-safe token; send it back with the OTP.
+      required:
+      - token
+    RefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    RegisterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        phone_number:
+          type: string
+          minLength: 1
+          pattern: ^\+880\d{10}$
+          maxLength: 14
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+      required:
+      - name
+      - phone_number
+    ResendOTPRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required:
+      - token
+    SignIn:
+      type: object
+      properties:
+        tokens:
+          $ref: '#/components/schemas/Tokens'
+      required:
+      - tokens
+    Tokens:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    VerifyOTPRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 200
+        otp:
+          type: string
+          minLength: 1
+          pattern: ^\d{6}$
+        cart:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          maxItems: 100
+        favorite:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          maxItems: 100
+      required:
+      - otp
+      - token
     ErrorEnvelope:
       type: object
       required:

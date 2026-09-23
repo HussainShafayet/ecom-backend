@@ -53,6 +53,21 @@ Then open:
 | http://127.0.0.1:8000/api/docs/ | Swagger UI (OpenAPI) |
 | http://127.0.0.1:8000/admin/ | Django admin (staff) |
 
+### Signing in during development (OTP)
+
+Customers have no password: they sign up / sign in with a phone number and a 6-digit code. In dev the code is not
+sent anywhere, it is **printed in the `runserver` terminal**:
+
+```
+WARNING apps.accounts.otp [DEV ONLY] OTP for +8801712345678 (register): 402885
+```
+
+Type that into the frontend's OTP page. Codes expire after 5 minutes (`OTP_TTL_SECONDS`), allow 5 wrong tries, and can be
+resent every 60 s. To plug in a real SMS/email provider, write a class with
+`send(self, *, target, code, purpose)` (see `apps/accounts/otp/backends.py`) and set `OTP_BACKEND` to its dotted path.
+
+Staff (Django admin) are the only users with passwords: `python manage.py createsuperuser`.
+
 ### Point the frontend at it
 
 In `../ecom/.env`:
@@ -76,12 +91,21 @@ python manage.py spectacular --file openapi.yaml --validate --fail-on-warn   # r
 python manage.py check --deploy --settings=config.settings.prod              # production readiness (needs prod env vars)
 ```
 
+## Production notes
+
+- `DJANGO_SETTINGS_MODULE=config.settings.prod`, `DEBUG` off, real `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`.
+- **`OTP_BACKEND` has no default in prod**: startup fails until you point it at a real delivery class.
+- Rate-limit counters live in a database cache shared by all workers. Create its table once:
+  `python manage.py createcachetable`
+- Blacklisted refresh tokens pile up. Purge expired ones regularly (cron, e.g. daily):
+  `python manage.py flushexpiredtokens`
+
 ## Layout
 
 ```
 config/            settings/{base,dev,prod}.py, urls.py, api_urls.py (everything under /api/v1/)
 apps/core/         response envelope, error handling, pagination, money helpers, URL helper, health check
-apps/accounts/     custom User (phone identity)
+apps/accounts/     custom phone User, OTP register/login, JWT refresh/logout (profile + addresses come next)
 docs/API_CONTRACT.md   canonical API contract (what the frontend calls)
 openapi.yaml       generated schema (keep in sync: see command above)
 ```

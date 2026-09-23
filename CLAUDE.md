@@ -52,6 +52,14 @@ schema together, and never diverge from what the frontend calls without the user
   writing `OrderStatusHistory`.
 - Status codes matter to the frontend: bad OTP/validation/out-of-stock = 400; 401 ONLY for missing/expired/invalid
   tokens (a 401 makes the frontend try to refresh, then log the user out).
+- `apps/accounts` (and `core`) must not import shop apps (catalog/cart/orders...): this base is reused for other
+  projects. Cross-app hooks go through signals, e.g. `accounts.signals.guest_data_received` (guest cart/favorites
+  sent at sign-in; the cart/wishlist apps connect a receiver). Receivers run with `send_robust`.
+- A DRF view with `authentication_classes = []` must define `get_authenticate_header()`, otherwise DRF turns every 401
+  into a 403 (see `PublicAuthView`). Public auth views ignore the Authorization header on purpose: the frontend sends
+  its stale access token to refresh/logout.
+- OTP delivery is pluggable via `OTP_BACKEND` (`apps/accounts/otp/backends.py`). Only `ConsoleOTPBackend` may print
+  a code, and prod has no default backend.
 - Both `/x` and `/x/` must resolve with no redirect: register routes with `apps.core.urls.dual_path`. `APPEND_SLASH=False`.
 - Views stay thin, logic lives in `services.py`; serializers validate; permissions per view. The default permission is
   `IsAuthenticated`, so public endpoints must say `permission_classes = [AllowAny]`.

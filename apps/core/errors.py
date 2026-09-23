@@ -31,8 +31,13 @@ def _walk(detail, path):
         yield path, str(detail)
 
 
+ACRONYMS = {"otp", "id", "sku", "url"}
+
+
 def _label(path):
-    return " ".join(part.replace("_", " ") for part in path).strip().capitalize()
+    words = " ".join(part.replace("_", " ") for part in path).split()
+    label = " ".join(word.upper() if word.lower() in ACRONYMS else word for word in words)
+    return label[:1].upper() + label[1:]
 
 
 def flatten_errors(detail):

@@ -4,7 +4,7 @@ Canonical contract between the React frontend (`../ecom`) and this backend. It m
 sends and reads today. **Anything that would require a frontend change is marked "proposed" and needs the
 user's approval first.**
 
-Implementation status is tracked in the README/plan; at the time of writing only `GET /health/` is live.
+Implementation status is tracked in the plan; sections marked *(live)* are implemented (health + auth so far).
 
 - **Base URL:** `{API_ROOT}/` = `http://localhost:8000/api/v1/`. The frontend's `VITE_BASE_URL` must **end with `/`**.
 - **Slashes:** every route answers both with and without a trailing slash, with no redirect. The slash form is canonical.
@@ -43,19 +43,23 @@ Implementation status is tracked in the README/plan; at the time of writing only
 Pagination: `?page=` (1-based) and `?page_size=` (default 30, max 120; the UI offers 30/60/90/120).
 A page past the end returns 200 with `results: []` and `next: null`.
 
-## 2. Auth: `/accounts/…` (phone + OTP, no passwords)
+## 2. Auth: `/accounts/…` (phone + OTP, no passwords)  *(live)*
 
 | Endpoint | Body | `data` |
 |---|---|---|
-| `POST /accounts/register/` | `{name, phone_number, email?}` | `{token}` (+ message). Creates an unverified user; `400` if the phone is already verified. Sends an OTP. `token` is an opaque **URL-safe** string (the frontend puts it in the path `/verify-otp/:token`). |
-| `POST /accounts/login/` | `{phone_number, expiresInMins?}` (extra key ignored) | `{token}`. `400` if no such verified user. Sends an OTP. |
-| `POST /accounts/verify-otp/` | `{token, otp, cart:[{product_id, quantity, variant_id?}], favorite:[{product_id}]}` (**key is `favorite`**) | `{tokens:{access, refresh}}`. Marks the phone verified and merges the guest cart (quantities are added, capped at availability) and favorites. |
-| `POST /accounts/resend-otp/` | `{token}` | message. Cooldown / max resends enforced (429/400). |
-| `POST /accounts/token/refresh/` | `{refresh, expiresInMins?}` + `Bearer <expired access>` (ignored) | `{access, refresh}`. **Must return `refresh`** (rotation; the old one is blacklisted). Invalid refresh → 401. |
-| `POST /accounts/logout/` | `{access, refresh}` + Bearer | message. Blacklists the refresh token; 200 even if it is already invalid. |
+| `POST /accounts/register/` | `{name, phone_number, email?}` | `{token}`, message `OTP sent to +88017****5678.` Creates an unverified user (or re-uses one that never verified); `400` if the phone is already verified or the email is taken. `token` is an opaque **URL-safe** string (the frontend puts it in the path `/verify-otp/:token`). |
+| `POST /accounts/login/` | `{phone_number, expiresInMins?}` (extra key ignored) | `{token}`. `400` if the number is unknown, not verified yet, or the account is disabled. |
+| `POST /accounts/verify-otp/` | `{token, otp, cart:[{product_id, quantity, variant_id?}], favorite:[{product_id}]}` (**key is `favorite`**) | `{tokens:{access, refresh}}`. Marks the phone verified. `cart`/`favorite` are optional lists of objects (max 100 each) handed to the shop apps through the `guest_data_received` signal; malformed entries are the receivers' problem and never block sign-in. |
+| `POST /accounts/resend-otp/` | `{token}` | `null` (+ message). Same token, new code; also allowed after the old code expired. |
+| `POST /accounts/token/refresh/` | `{refresh, expiresInMins?}`; the `Authorization` header (a stale access token) is ignored | `{access, refresh}`. **Always returns a new `refresh`** (rotation); the old one is blacklisted, replaying it is `401`. Invalid/expired/blacklisted refresh, or a disabled/deleted user: `401` (with `WWW-Authenticate: Bearer`). |
+| `POST /accounts/logout/` | `{access?, refresh?}` (Bearer ignored) | `null`. Blacklists the refresh token. Idempotent: `200` even if it is missing, invalid or already revoked. `access` is accepted and ignored (access tokens are short-lived and stateless). |
 
-OTP: 6 digits, hashed at rest, 5 minutes to live, max 5 attempts. In dev the OTP is printed to the server log.
-A wrong OTP is **400**, never 401.
+OTP rules (all configurable in `.env`): 6 digits, hashed at rest, valid 5 minutes, max 5 wrong attempts per code, a resend
+every 60 s at most and max 3 resends per token, max 5 codes per phone per hour, plus per-IP throttles.
+Only the newest code for a number is valid. A wrong/expired/used code is **400** (never 401), with a readable message,
+e.g. `Invalid OTP. 4 attempts left.`, `This OTP has expired. Please request a new one.`,
+`Too many incorrect attempts. Please request a new OTP.` Throttled requests are `429` with `Retry-After`.
+A delivery failure is `503` (nothing is created). In dev the code is printed in the server log.
 
 ## 3. Profile & addresses (auth required)
 

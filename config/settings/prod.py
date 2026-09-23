@@ -21,5 +21,17 @@ SECURE_HSTS_PRELOAD = env.bool("SECURE_HSTS_PRELOAD", default=False)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
+# No default on purpose: a deployment without a real OTP delivery class must fail loudly at startup
+# instead of silently printing codes to the log.
+OTP_BACKEND = env("OTP_BACKEND")
+
+# Throttle counters shared between worker processes (create the table once: manage.py createcachetable).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
+    }
+}
+
 # Keep DB connections open between requests.
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)  # noqa: F405

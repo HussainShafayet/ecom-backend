@@ -43,7 +43,7 @@ def test_handler_validation_error():
     response = envelope_exception_handler(ValidationError({"otp": ["Invalid OTP."]}), {})
     assert response.status_code == 400
     assert response.data["message"] == "Validation failed."
-    assert response.data["errors"] == ["Otp: Invalid OTP."]
+    assert response.data["errors"] == ["OTP: Invalid OTP."]  # acronyms keep their capitals
     assert response.data["field_errors"] == {"otp": ["Invalid OTP."]}
 
 
