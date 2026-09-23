@@ -16,6 +16,12 @@ def _isolated_environment(settings):
     cache.clear()
 
 
+@pytest.fixture(autouse=True)
+def _media_root(settings, tmp_path):
+    """Uploads in tests land in a throw-away folder, never in ./media."""
+    settings.MEDIA_ROOT = tmp_path / "media"
+
+
 @pytest.fixture
 def api_client():
     return APIClient()

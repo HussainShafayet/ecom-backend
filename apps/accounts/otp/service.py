@@ -103,22 +103,21 @@ def resend_otp(*, token, purposes):
     return otp
 
 
-def verify_otp(*, token, code, purposes):
+def verify_otp(*, token, code, purposes, user=None):
     """Check `code` for `token`; on success mark it used and return the OTPRequest.
 
     Only OTPs whose purpose is in `purposes` count, so a profile-change OTP can never log someone in.
-    A wrong guess is recorded before the error is raised (raising inside the atomic block would
-    roll the attempt counter back).
+    Pass `user` for authenticated flows (profile changes): a token issued to someone else is then
+    "invalid". A wrong guess is recorded before the error is raised (raising inside the atomic block
+    would roll the attempt counter back).
     """
     now = timezone.now()
     failure = None
     with transaction.atomic():
-        otp = (
-            OTPRequest.objects.select_for_update()
-            .select_related("user")
-            .filter(token_hash=_hash_token(token), purpose__in=purposes)
-            .first()
-        )
+        candidates = OTPRequest.objects.select_for_update().select_related("user")
+        if user is not None:
+            candidates = candidates.filter(user=user)
+        otp = candidates.filter(token_hash=_hash_token(token), purpose__in=purposes).first()
         if otp is None or otp.consumed_at is not None:
             failure = MSG_INVALID_TOKEN
         elif otp.expires_at <= now:

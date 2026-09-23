@@ -9,4 +9,9 @@ urlpatterns = [
     *dual_path("resend-otp/", views.ResendOTPView.as_view(), name="resend-otp"),
     *dual_path("token/refresh/", views.TokenRefreshView.as_view(), name="token-refresh"),
     *dual_path("logout/", views.LogoutView.as_view(), name="logout"),
+    *dual_path("profile/", views.ProfileView.as_view(), name="profile"),
+    *dual_path("request-otp/", views.ProfileOTPRequestView.as_view(), name="profile-request-otp"),
+    *dual_path(
+        "verify-otp-for-profile/", views.ProfileOTPVerifyView.as_view(), name="profile-verify-otp"
+    ),
 ]

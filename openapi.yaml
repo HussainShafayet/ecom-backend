@@ -5,6 +5,248 @@ info:
   description: REST API for the GoCart storefront. Every response uses the `{success,
     message, data | errors}` envelope described in docs/API_CONTRACT.md.
 paths:
+  /api/v1/accounts/addresses/:
+    get:
+      operationId: accounts_addresses_list
+      summary: List my saved addresses (plain array)
+      tags:
+      - addresses
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Address'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: accounts_addresses_create
+      summary: Save a new address
+      tags:
+      - addresses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/Address'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/addresses/{id}/:
+    get:
+      operationId: accounts_addresses_retrieve
+      summary: Get one of my addresses
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - addresses
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/Address'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: accounts_addresses_update
+      summary: Update an address (partial; read-only keys such as `id` are ignored)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - addresses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/Address'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      operationId: accounts_addresses_destroy
+      summary: Delete an address
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - addresses
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    nullable: true
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/accounts/login/:
     post:
       operationId: accounts_login_create
@@ -117,6 +359,97 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/profile/:
+    get:
+      operationId: accounts_profile_retrieve
+      summary: Get my profile
+      tags:
+      - profile
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/Profile'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: accounts_profile_update
+      description: Send only what changed, as multipart (needed for `profile_picture`)
+        or JSON. A new `phone_number` or `email` is accepted only after it was verified
+        through `request-otp/` + `verify-otp-for-profile/` (within a limited time,
+        once per verification).
+      summary: Update my profile (partial)
+      tags:
+      - profile
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdateRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/Profile'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/accounts/register/:
     post:
       operationId: accounts_register_create
@@ -141,6 +474,57 @@ paths:
         required: true
       security:
       - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OTPSent'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/request-otp/:
+    post:
+      operationId: accounts_request_otp_create
+      summary: Send an OTP to a NEW phone number or email
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileOTPRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProfileOTPRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProfileOTPRequestRequest'
+      security:
+      - jwtAuth: []
       responses:
         '200':
           content:
@@ -336,6 +720,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/verify-otp-for-profile/:
+    post:
+      operationId: accounts_verify_otp_for_profile_create
+      description: Wrong OTP is a 400 (never 401). After this succeeds, save the value
+        with PUT /profile/.
+      summary: Verify the OTP sent for a profile change
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileOTPVerifyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProfileOTPVerifyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProfileOTPVerifyRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/ProfileOTPVerified'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/health/:
     get:
       operationId: health_retrieve
@@ -377,6 +815,84 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
+    Address:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 100
+        shipping_type:
+          $ref: '#/components/schemas/ShippingTypeEnum'
+        address:
+          type: string
+          maxLength: 500
+        area:
+          type: string
+          maxLength: 100
+        division:
+          type: string
+          maxLength: 100
+        district:
+          type: string
+          maxLength: 100
+        thana:
+          type: string
+          maxLength: 100
+      required:
+      - address
+      - id
+      - shipping_type
+    AddressRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        shipping_type:
+          $ref: '#/components/schemas/ShippingTypeEnum'
+        address:
+          type: string
+          minLength: 1
+          maxLength: 500
+        area:
+          type: string
+          maxLength: 100
+        division:
+          type: string
+          maxLength: 100
+        district:
+          type: string
+          maxLength: 100
+        thana:
+          type: string
+          maxLength: 100
+      required:
+      - address
+      - shipping_type
+    BlankEnum:
+      enum:
+      - ''
+    FieldEnum:
+      enum:
+      - phone_number
+      - email
+      type: string
+      description: |-
+        * `phone_number` - phone_number
+        * `email` - email
+    GenderEnum:
+      enum:
+      - male
+      - female
+      - other
+      type: string
+      description: |-
+        * `male` - Male
+        * `female` - Female
+        * `other` - Other
     Health:
       type: object
       properties:
@@ -412,6 +928,129 @@ components:
           description: Opaque URL-safe token; send it back with the OTP.
       required:
       - token
+    Profile:
+      type: object
+      description: What GET/PUT /accounts/profile/ return (exactly the keys the frontend
+        reads).
+      properties:
+        name:
+          type: string
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          nullable: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+          nullable: true
+        phone_number:
+          type: string
+          readOnly: true
+        date_of_birth:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+        gender:
+          allOf:
+          - $ref: '#/components/schemas/GenderEnum'
+          readOnly: true
+        profile_picture:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+      required:
+      - date_of_birth
+      - email
+      - gender
+      - name
+      - phone_number
+      - profile_picture
+      - username
+    ProfileOTPRequestRequest:
+      type: object
+      description: Ask for an OTP to verify a NEW phone number or email (exactly one
+        of them).
+      properties:
+        phone_number:
+          type: string
+          minLength: 1
+          pattern: ^\+880\d{10}$
+          maxLength: 14
+        email:
+          type: string
+          format: email
+          minLength: 1
+    ProfileOTPVerified:
+      type: object
+      properties:
+        field:
+          $ref: '#/components/schemas/FieldEnum'
+        value:
+          type: string
+      required:
+      - field
+      - value
+    ProfileOTPVerifyRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 200
+        otp:
+          type: string
+          minLength: 1
+          pattern: ^\d{6}$
+      required:
+      - otp
+      - token
+    ProfileUpdateRequest:
+      type: object
+      description: |-
+        Every field optional: the frontend sends only what changed (or just `profile_picture`).
+
+        phone_number / email are format-checked here; whether they were OTP-verified is enforced when saving.
+        Unknown keys (is_staff, id, ...) are ignored.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        username:
+          nullable: true
+          oneOf:
+          - type: string
+            pattern: ^[A-Za-z0-9_.-]{3,50}$
+            maxLength: 50
+          - type: string
+            maxLength: 0
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          pattern: ^\+880\d{10}$
+          maxLength: 14
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+        gender:
+          oneOf:
+          - $ref: '#/components/schemas/GenderEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        profile_picture:
+          type: string
+          format: binary
     RefreshRequest:
       type: object
       properties:
@@ -451,6 +1090,14 @@ components:
           maxLength: 200
       required:
       - token
+    ShippingTypeEnum:
+      enum:
+      - inside_dhaka
+      - outside_dhaka
+      type: string
+      description: |-
+        * `inside_dhaka` - Inside Dhaka
+        * `outside_dhaka` - Outside Dhaka
     SignIn:
       type: object
       properties:
@@ -523,3 +1170,8 @@ components:
             type: array
             items:
               type: string
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

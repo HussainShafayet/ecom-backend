@@ -39,3 +39,27 @@ def register_and_get_code(client, otp_outbox, **kwargs):
     response = sign_up(client, **kwargs)
     assert response.status_code == 200, response.content
     return response.json()["data"]["token"], otp_outbox[-1].code
+
+
+# --- authenticated clients and uploads ------------------------------------------------------------------
+import io  # noqa: E402
+
+from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
+from PIL import Image  # noqa: E402
+from rest_framework.test import APIClient  # noqa: E402
+
+from apps.accounts.services import issue_tokens  # noqa: E402
+
+
+def authed_client(user):
+    """A client sending a real JWT access token, like the frontend does."""
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {issue_tokens(user)['access']}")
+    return client
+
+
+def image_upload(name="me.png", fmt="PNG", size=(8, 8)):
+    buffer = io.BytesIO()
+    Image.new("RGB", size, (200, 30, 30)).save(buffer, format=fmt)
+    content_type = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp", "GIF": "image/gif"}[fmt]
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type=content_type)

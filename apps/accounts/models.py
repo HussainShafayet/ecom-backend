@@ -2,8 +2,11 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 
+from apps.core.uploads import RandomUploadTo
+from apps.core.validators import validate_image_upload
+
 from .managers import UserManager
-from .validators import phone_number_validator
+from .validators import phone_number_validator, username_validator
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -19,9 +22,17 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
     email = models.EmailField(unique=True, null=True, blank=True)  # NULL (never "") when absent
     name = models.CharField(max_length=150)
-    username = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    username = models.CharField(
+        max_length=50, unique=True, null=True, blank=True, validators=[username_validator]
+    )
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=Gender.choices, blank=True)
+    profile_picture = models.ImageField(
+        upload_to=RandomUploadTo("profile_pictures"),
+        null=True,
+        blank=True,
+        validators=[validate_image_upload],
+    )
 
     is_phone_verified = models.BooleanField(default=False)
     is_email_verified = models.BooleanField(default=False)
@@ -74,6 +85,9 @@ class OTPRequest(models.Model):
     last_sent_at = models.DateTimeField()
     expires_at = models.DateTimeField()
     consumed_at = models.DateTimeField(null=True, blank=True)
+    # profile OTPs only: set when the verified value has been saved on the profile, so one
+    # verification can be used for exactly one change
+    applied_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

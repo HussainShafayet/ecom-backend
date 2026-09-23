@@ -71,6 +71,12 @@ resent every 60 s. To plug in a real SMS/email provider, write a class with
 
 Staff (Django admin) are the only users with passwords: `python manage.py createsuperuser`.
 
+### Uploaded files (profile pictures)
+
+In dev they are stored in `backend/media/` (gitignored) and served by `runserver` at `/media/...`; the API returns
+absolute URLs. JPEG/PNG/WebP up to `MAX_IMAGE_UPLOAD_MB` (5). Production storage (S3-compatible) is configured in the
+hardening step, until then use a reverse proxy/volume for `MEDIA_ROOT`.
+
 ### Point the frontend at it
 
 In `../ecom/.env`:
@@ -108,7 +114,8 @@ python manage.py check --deploy --settings=config.settings.prod              # p
 ```
 config/            settings/{base,dev,prod}.py, urls.py, api_urls.py (everything under /api/v1/)
 apps/core/         response envelope, error handling, pagination, money helpers, URL helper, health check
-apps/accounts/     custom phone User, OTP register/login, JWT refresh/logout (profile + addresses come next)
+apps/accounts/     custom phone User, OTP register/login, JWT refresh/logout, profile (+ OTP-verified phone/email change, picture)
+apps/addresses/    saved shipping addresses (shop-specific, not part of the template base)
 docs/API_CONTRACT.md   canonical API contract (what the frontend calls)
 openapi.yaml       generated schema (keep in sync: see command above)
 ```
