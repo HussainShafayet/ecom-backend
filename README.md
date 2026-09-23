@@ -5,6 +5,9 @@ OpenAPI via drf-spectacular. The API shape is dictated by the frontend, see [doc
 
 No Docker: a Python virtualenv plus a locally installed PostgreSQL.
 
+> **Template:** `config/`, `apps/core` and `apps/accounts` are a reusable base (tag `template-base-v1`). To start another
+> project from it, follow [docs/NEW_PROJECT.md](docs/NEW_PROJECT.md).
+
 ## Requirements
 
 - Python 3.12+ (developed on 3.14)
