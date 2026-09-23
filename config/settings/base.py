@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     # local
     "apps.core",
     "apps.accounts",
+    "apps.addresses",
 ]
 
 MIDDLEWARE = [
@@ -82,6 +83,12 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Uploaded files (profile pictures, ...). Dev: served from ./media by runserver. Prod: an S3-compatible
+# store is configured in a later step; the API always returns absolute URLs.
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+MAX_IMAGE_UPLOAD_MB = env.int("MAX_IMAGE_UPLOAD_MB", default=5)
+
 # The frontend calls both `/products` and `/products/` (and `/accounts/cart/`, ...). A 301 redirect would
 # break CORS preflights that carry an Authorization header, so URLs are registered in both forms instead
 # (see apps.core.urls.dual_path) and Django must never redirect.
@@ -129,6 +136,11 @@ OTP_MAX_ATTEMPTS = env.int("OTP_MAX_ATTEMPTS", default=5)
 OTP_RESEND_COOLDOWN_SECONDS = env.int("OTP_RESEND_COOLDOWN_SECONDS", default=60)
 OTP_MAX_RESENDS = env.int("OTP_MAX_RESENDS", default=3)
 OTP_MAX_REQUESTS_PER_TARGET_PER_HOUR = env.int("OTP_MAX_REQUESTS_PER_TARGET_PER_HOUR", default=5)
+# After verifying a new phone/email with an OTP the user has this long to save it on the profile.
+PROFILE_VERIFICATION_WINDOW_SECONDS = env.int("PROFILE_VERIFICATION_WINDOW_SECONDS", default=900)
+
+# --- shop ---------------------------------------------------------------------------------------------
+MAX_ADDRESSES_PER_USER = env.int("MAX_ADDRESSES_PER_USER", default=20)
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env.int("JWT_ACCESS_MINUTES", default=15)),

@@ -1,16 +1,22 @@
 from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.core.responses import api_response
-from apps.core.utils import mask_phone
+from apps.core.utils import mask_email, mask_phone
 
-from . import services
+from . import profile_services, services
 from .serializers import (
     LoginSerializer,
     LogoutSerializer,
     OTPSentSerializer,
+    ProfileOTPRequestSerializer,
+    ProfileOTPVerifiedSerializer,
+    ProfileOTPVerifySerializer,
+    ProfileSerializer,
+    ProfileUpdateSerializer,
     RefreshSerializer,
     RegisterSerializer,
     ResendOTPSerializer,
@@ -133,3 +139,81 @@ class LogoutView(PublicAuthView):
         if refresh:
             services.blacklist_refresh_token(refresh)
         return api_response(None, message="Logged out.")
+
+
+# --- profile (authenticated: default IsAuthenticated + JWT) -------------------------------------------
+class ProfileView(APIView):
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    @extend_schema(tags=["profile"], summary="Get my profile", responses=ProfileSerializer)
+    def get(self, request):
+        return api_response(ProfileSerializer(request.user, context={"request": request}).data)
+
+    @extend_schema(
+        tags=["profile"],
+        summary="Update my profile (partial)",
+        description="Send only what changed, as multipart (needed for `profile_picture`) or JSON. "
+        "A new `phone_number` or `email` is accepted only after it was verified through "
+        "`request-otp/` + `verify-otp-for-profile/` (within a limited time, once per verification).",
+        request={
+            "multipart/form-data": ProfileUpdateSerializer,
+            "application/json": ProfileUpdateSerializer,
+        },
+        responses=ProfileSerializer,
+    )
+    def put(self, request):
+        serializer = ProfileUpdateSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        user = profile_services.update_profile(user=request.user, data=serializer.validated_data)
+        return api_response(
+            ProfileSerializer(user, context={"request": request}).data, message="Profile updated."
+        )
+
+    @extend_schema(exclude=True)  # PATCH is an alias of PUT (both are partial); document only PUT
+    def patch(self, request):
+        return self.put(request)
+
+
+class ProfileOTPView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "otp_send"
+
+
+class ProfileOTPRequestView(ProfileOTPView):
+    @extend_schema(
+        tags=["profile"],
+        summary="Send an OTP to a NEW phone number or email",
+        request=ProfileOTPRequestSerializer,
+        responses=OTPSentSerializer,
+    )
+    def post(self, request):
+        serializer = ProfileOTPRequestSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        field, value = serializer.validated_data["field"], serializer.validated_data["value"]
+        token = profile_services.start_change_verification(user=request.user, field=field, value=value)
+        masked = mask_phone(value) if field == "phone_number" else mask_email(value)
+        return api_response({"token": token}, message=f"OTP sent to {masked}.")
+
+
+class ProfileOTPVerifyView(ProfileOTPView):
+    throttle_scope = "otp_verify"
+
+    @extend_schema(
+        tags=["profile"],
+        summary="Verify the OTP sent for a profile change",
+        description="Wrong OTP is a 400 (never 401). After this succeeds, save the value with PUT /profile/.",
+        request=ProfileOTPVerifySerializer,
+        responses=ProfileOTPVerifiedSerializer,
+    )
+    def post(self, request):
+        serializer = ProfileOTPVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        field, value = profile_services.verify_change(
+            user=request.user,
+            token=serializer.validated_data["token"],
+            code=serializer.validated_data["otp"],
+        )
+        return api_response(
+            {"field": field, "value": value},
+            message="Verified. Save your profile to apply the change.",
+        )

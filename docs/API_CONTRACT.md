@@ -4,7 +4,7 @@ Canonical contract between the React frontend (`../ecom`) and this backend. It m
 sends and reads today. **Anything that would require a frontend change is marked "proposed" and needs the
 user's approval first.**
 
-Implementation status is tracked in the plan; sections marked *(live)* are implemented (health + auth so far).
+Implementation status is tracked in the plan; sections marked *(live)* are implemented (health, auth, profile, addresses so far).
 
 - **Base URL:** `{API_ROOT}/` = `http://localhost:8000/api/v1/`. The frontend's `VITE_BASE_URL` must **end with `/`**.
 - **Slashes:** every route answers both with and without a trailing slash, with no redirect. The slash form is canonical.
@@ -61,21 +61,37 @@ e.g. `Invalid OTP. 4 attempts left.`, `This OTP has expired. Please request a ne
 `Too many incorrect attempts. Please request a new OTP.` Throttled requests are `429` with `Retry-After`.
 A delivery failure is `503` (nothing is created). In dev the code is printed in the server log.
 
-## 3. Profile & addresses (auth required)
+## 3. Profile & addresses (auth required)  *(live)*
 
 | Endpoint | Request | `data` |
 |---|---|---|
-| `GET /accounts/profile/` | | `{name, username, email, phone_number, date_of_birth, gender, profile_picture}` (`phone_number` never null; `gender` ∈ male/female/other/"") |
-| `PUT /accounts/profile/` | multipart, **partial** (changed fields only, or just `profile_picture`) | the updated profile. Changing `phone_number` or `email` requires that exact new value to have been OTP-verified first (enforced server side). |
-| `POST /accounts/request-otp/` | `{phone_number}` **or** `{email}` | `{token}` |
-| `POST /accounts/verify-otp-for-profile/` | `{token, otp}` | message (wrong OTP = 400) |
-| `GET /accounts/addresses/` | | **array** of Address (not paginated) |
-| `POST /accounts/addresses/` | `{title?, shipping_type, address, area?, division?, district?, thana?}` | the created Address incl. `id` |
-| `PUT /accounts/addresses/{id}/` | full or partial Address (read-only keys such as `id` are ignored) | the updated Address |
-| `DELETE /accounts/addresses/{id}/` | | `null` |
+| `GET /accounts/profile/` | | `{name, username, email, phone_number, date_of_birth, gender, profile_picture}`: `phone_number` never null; `username`/`email`/`date_of_birth`/`profile_picture` are `null` when unset; `gender` ∈ male/female/other/`""`; `profile_picture` is an absolute URL |
+| `PUT /accounts/profile/` (`PATCH` is an alias) | multipart or JSON, **partial**: send only what changed (or just `profile_picture`). Unknown/privileged keys (`is_staff`, `id`, …) are ignored | the updated profile |
+| `POST /accounts/request-otp/` | `{phone_number}` **or** `{email}` (exactly one): the NEW value | `{token}`, message `OTP sent to +88017****5678.` `400` if it is the user's current value or belongs to another account |
+| `POST /accounts/verify-otp-for-profile/` | `{token, otp}` | `{field: "phone_number"\|"email", value}`. Wrong OTP = **400** (never 401). The token must belong to the caller |
+| `GET /accounts/addresses/` | | **plain array** of Address (not paginated), oldest first |
+| `POST /accounts/addresses/` | Address fields (`201`) | the created Address incl. `id` |
+| `GET /accounts/addresses/{id}/` | | one Address |
+| `PUT /accounts/addresses/{id}/` (`PATCH` alias) | the whole edited Address or just some fields (**partial**); `id` and other read-only keys are ignored | the updated Address |
+| `DELETE /accounts/addresses/{id}/` | | `null` (200) |
+
+**Changing the phone number or email.** A new `phone_number`/`email` in `PUT /profile/` is accepted only if that exact
+value was verified with `request-otp/` + `verify-otp-for-profile/` within the last 15 minutes
+(`PROFILE_VERIFICATION_WINDOW_SECONDS`), and one verification pays for one change; otherwise `400` with
+`field_errors.<field> = ["Verify this … with an OTP before saving it."]`. Re-saving the current value needs no OTP,
+and `email: ""` removes the email without one. A verified new phone number replaces the login number at once.
+
+**Validation:** `name` ≤ 150 chars, not blank; `username` 3-50 chars of `A-Za-z0-9_.-`, unique ignoring case (`""` clears it);
+`date_of_birth` `YYYY-MM-DD`, not in the future, ≥ 1900; `gender` male/female/other/`""`.
+In a *multipart* form an empty field means "not sent" (DRF's rule), in JSON `""` is a real value.
+
+**Profile picture:** JPEG, PNG or WebP (real format is checked, not the file name), ≤ 5 MB (`MAX_IMAGE_UPLOAD_MB`);
+stored under a random name (the original filename is discarded); the previous picture file is deleted when replaced.
 
 `Address = {id, title, shipping_type: "inside_dhaka"|"outside_dhaka", address, area, division, district, thana}`.
-Location values are plain names (from the frontend's static `location.js`); irrelevant ones may be `""`.
+Location values are plain names (from the frontend's static `location.js`). `shipping_type` and `address` are required;
+`inside_dhaka` requires `area`, `outside_dhaka` requires `division`, `district`, `thana`; fields that do not apply are
+cleared. `title` is optional. At most 20 addresses per user (`MAX_ADDRESSES_PER_USER`). Someone else's address is a `404`.
 
 ## 4. Cart & wishlist (auth required)
 

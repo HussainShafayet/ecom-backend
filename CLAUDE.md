@@ -35,7 +35,7 @@ python manage.py spectacular --file openapi.yaml --validate --fail-on-warn
 ## Structure
 
 `config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) ·
-`apps/{core,accounts,catalog,cart,orders,payments,reviews,content}` (built step by step) ·
+`apps/{core,accounts,addresses,catalog,cart,orders,payments,reviews,content}` (built step by step) ·
 `docs/API_CONTRACT.md` · `openapi.yaml`
 
 ## API contract
@@ -66,5 +66,8 @@ schema together, and never diverge from what the frontend calls without the user
 - Both `/x` and `/x/` must resolve with no redirect: register routes with `apps.core.urls.dual_path`. `APPEND_SLASH=False`.
 - Views stay thin, logic lives in `services.py`; serializers validate; permissions per view. The default permission is
   `IsAuthenticated`, so public endpoints must say `permission_classes = [AllowAny]`.
+- Uploads: `ImageField(upload_to=RandomUploadTo("folder"), validators=[validate_image_upload])` (apps/core): random
+  file names, real-format + size check, delete the old file in `transaction.on_commit` when replacing. Tests never write to
+  `./media` (conftest points MEDIA_ROOT at a temp dir).
 - Uploads: validate type and size. HTML fields are sanitized with nh3 on write. Never log OTPs; mask phone numbers.
 - Tests with pytest-django. Every step ends with `pytest` green and `spectacular --validate --fail-on-warn` clean.
