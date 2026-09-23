@@ -1,0 +1,87 @@
+openapi: 3.0.3
+info:
+  title: GoCart API
+  version: 1.0.0
+  description: REST API for the GoCart storefront. Every response uses the `{success,
+    message, data | errors}` envelope described in docs/API_CONTRACT.md.
+paths:
+  /api/v1/health/:
+    get:
+      operationId: health_retrieve
+      description: 'Readiness probe: the API is up and can reach PostgreSQL.'
+      summary: Health check
+      tags:
+      - health
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/Health'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+components:
+  schemas:
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+        database:
+          type: string
+      required:
+      - database
+      - status
+    ErrorEnvelope:
+      type: object
+      required:
+      - success
+      - message
+      - error
+      - errors
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Validation failed.
+        error:
+          type: string
+          example: 'Phone number: This field is required.'
+        errors:
+          type: array
+          items:
+            type: string
+          example:
+          - 'Phone number: This field is required.'
+        field_errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
