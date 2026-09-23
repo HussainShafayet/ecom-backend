@@ -1,6 +1,9 @@
 # CLAUDE.md — GoCart Backend
 
-Django + DRF REST API for the GoCart React frontend (repo: `../ecom`). **The frontend is the source of truth for the API
+<!-- TEMPLATE: this repo is reused for other projects. Lines tagged [PROJECT] must be rewritten when you start a
+new project from it. See docs/NEW_PROJECT.md. -->
+
+[PROJECT] Django + DRF REST API for the GoCart React frontend (repo: `../ecom`). **The frontend is the source of truth for the API
 shape**: endpoints, field names and the response envelope come from what `../ecom/src` actually calls and reads.
 
 ## Stack (fixed, do not change)
@@ -11,11 +14,11 @@ django-cors-headers. Celery and Redis are NOT set up; ask before adding them.
 
 ## Working rules
 
-- Run backend commands only as
-  `cd /home/shafayet/Desktop/personal/e-commerce/backend && source venv/bin/activate && <cmd>`
-  (Windows: `venv\Scripts\activate`). Never run `manage.py` or `pytest` from the frontend folder.
-- Backend git: `git -C /home/shafayet/Desktop/personal/e-commerce/backend ...`. Frontend (`ecom/`) and backend are
-  separate repos: never mix their commits; each gets its own commit message.
+- Run backend commands only as `cd <backend-dir> && source venv/bin/activate && <cmd>` (Windows:
+  `venv\Scripts\activate`), where `<backend-dir>` is the absolute path of THIS repo's root. Never run `manage.py` or
+  `pytest` from the frontend folder. [PROJECT] write the absolute path here for the new project (or keep it in Claude's memory).
+- Backend git: `git -C <backend-dir> ...`. [PROJECT] Frontend (`ecom/`) and backend are separate repos: never mix
+  their commits; each gets its own commit message.
 - No Docker, docker-compose or Dockerfile. Local setup = Python virtualenv + local PostgreSQL. Setup steps live in
   README.md; keep `requirements.txt`, `requirements-dev.txt` and `.env.example` current.
 - Never change a frontend API call, type or file without asking first; propose the change and wait.
@@ -37,7 +40,7 @@ python manage.py spectacular --file openapi.yaml --validate --fail-on-warn
 
 ## API contract
 
-Canonical: `docs/API_CONTRACT.md`. Generated schema: `openapi.yaml` and `/api/docs/`. Change the contract doc and the
+[PROJECT] Canonical: `docs/API_CONTRACT.md`. Generated schema: `openapi.yaml` and `/api/docs/`. Change the contract doc and the
 schema together, and never diverge from what the frontend calls without the user's approval.
 
 ## Conventions
