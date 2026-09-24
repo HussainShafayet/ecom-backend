@@ -2,6 +2,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serial
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import SAFE_METHODS, AllowAny, IsAuthenticated
+from rest_framework.settings import api_settings
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
@@ -35,7 +36,9 @@ class ReviewListCreateView(APIView):
         return [AllowAny() if self.request.method in SAFE_METHODS else IsAuthenticated()]
 
     def get_throttles(self):
-        return [] if self.request.method in SAFE_METHODS else super().get_throttles()
+        if self.request.method in SAFE_METHODS:  # reading is only held to the generous limits every view has
+            return [throttle() for throttle in api_settings.DEFAULT_THROTTLE_CLASSES]
+        return super().get_throttles()
 
     @extend_schema(
         tags=TAGS,

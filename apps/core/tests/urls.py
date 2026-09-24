@@ -58,7 +58,20 @@ class NumbersView(APIView):
         return paginator.get_paginated_response(page)
 
 
+class EchoView(APIView):
+    """Reads the body (JSON or multipart) and answers with the names of what it got; `hits` counts real runs."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    hits = 0
+
+    def post(self, request):
+        type(self).hits += 1
+        return api_response({"fields": sorted(request.data.keys())})
+
+
 urlpatterns = [
+    path("api/v1/_t/echo/", EchoView.as_view()),
     path("api/v1/_t/protected/", ProtectedView.as_view()),
     path("api/v1/_t/validate/", ValidationView.as_view()),
     path("api/v1/_t/plain/", PlainView.as_view()),

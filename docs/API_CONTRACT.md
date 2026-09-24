@@ -38,8 +38,15 @@ addresses, cart, wishlist, catalog, content, orders so far).
 | 401 | **only** a missing/expired/invalid access or refresh token (the frontend then refreshes, then logs out) |
 | 403 | authenticated but not allowed |
 | 404 | unknown route/resource (also `?page=abc`) |
+| 413 | the request is too big: an upload over `MAX_UPLOAD_REQUEST_MB` (default 255: 5 review videos of 50 MB plus the text) or a JSON/form body over `DATA_UPLOAD_MAX_MEMORY_SIZE` (2.5 MB). The usual envelope; refused before it is read |
 | 429 | throttled (`Retry-After` header) |
 | 5xx | server error (body never leaks internals) |
+
+Throttling: every endpoint has a generous default limit (`THROTTLE_ANON` 600/minute per client IP for guests,
+`THROTTLE_USER` 1200/minute per signed-in customer; a shop page makes about 10 calls). The endpoints that send an SMS or
+take stock (auth, orders, reviews, profile OTP) have tighter scopes of their own, listed with them below; a test fails
+if a new public write endpoint has none. The client IP is the address the reverse proxy appended to
+`X-Forwarded-For` (`NUM_PROXIES`), never the header as the client wrote it.
 
 Pagination: `?page=` (1-based) and `?page_size=` (default 30, max 120; the UI offers 30/60/90/120).
 A page past the end returns 200 with `results: []` and `next: null`.

@@ -9,7 +9,7 @@ handler404 = "apps.core.views.api_not_found"
 handler500 = "apps.core.views.api_server_error"
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     # API root: the frontend's VITE_BASE_URL points here (with the trailing slash).
     path("api/v1/", include("config.api_urls")),
 ]
