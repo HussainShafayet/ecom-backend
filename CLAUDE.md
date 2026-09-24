@@ -35,7 +35,7 @@ python manage.py spectacular --file openapi.yaml --validate --fail-on-warn
 ## Structure
 
 `config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) ·
-`apps/{core,accounts,addresses,catalog,cart,orders,payments,reviews,content}` (built step by step) ·
+`apps/{core,accounts,addresses,catalog,content,wishlist,cart,orders,payments,reviews}` (built step by step) ·
 `docs/API_CONTRACT.md` · `openapi.yaml`
 
 ## API contract

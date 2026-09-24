@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     "apps.addresses",
     "apps.catalog",
     "apps.content",
+    "apps.wishlist",
+    "apps.cart",
 ]
 
 MIDDLEWARE = [
@@ -144,6 +146,8 @@ PROFILE_VERIFICATION_WINDOW_SECONDS = env.int("PROFILE_VERIFICATION_WINDOW_SECON
 
 # --- shop ---------------------------------------------------------------------------------------------
 MAX_ADDRESSES_PER_USER = env.int("MAX_ADDRESSES_PER_USER", default=20)
+MAX_CART_LINES = env.int("MAX_CART_LINES", default=50)  # different products/variants in one cart
+MAX_FAVOURITES_PER_USER = env.int("MAX_FAVOURITES_PER_USER", default=200)
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env.int("JWT_ACCESS_MINUTES", default=15)),

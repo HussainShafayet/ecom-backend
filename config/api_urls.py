@@ -8,6 +8,8 @@ urlpatterns = [
     *dual_path("health/", HealthView.as_view(), name="health"),
     path("accounts/", include("apps.accounts.urls")),
     path("accounts/", include("apps.addresses.urls")),  # /accounts/addresses/
+    path("accounts/", include("apps.wishlist.urls")),  # /accounts/favourite/
+    path("accounts/", include("apps.cart.urls")),  # /accounts/cart/
     path("", include("apps.catalog.urls")),  # /products/…, /content/shop/
     path("", include("apps.content.urls")),  # /content/pages/<page>/
     # Keep last: unknown API paths answer with the JSON error envelope (also when DEBUG=True).
