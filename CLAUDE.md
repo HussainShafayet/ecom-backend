@@ -54,6 +54,10 @@ schema together, and never diverge from what the frontend calls without the user
   (lock variants in id order, then products, then the day's order counter). Order status changes only through
   `orders.services.change_status()`, which checks the transition map in `orders/state.py` and always writes
   `OrderStatusHistory`. Prices are always recomputed from the database, never taken from the request.
+- Payments: a `Payment` is opened and moved only by `apps/payments` (transition map in `payments/state.py`), driven by
+  the `orders.signals` (`order_placed`, `order_status_changed`, sent with `send()` inside the order's transaction so a
+  failure rolls both back). `orders` never imports `payments`. `order_placed` receivers run before the order number
+  exists and must not use it (do e-mail/SMS in `transaction.on_commit`).
 - Status codes matter to the frontend: bad OTP/validation/out-of-stock = 400; 401 ONLY for missing/expired/invalid
   tokens (a 401 makes the frontend try to refresh, then log the user out).
 - `apps/accounts` (and `core`) must not import shop apps (catalog/cart/orders...): this base is reused for other

@@ -15,6 +15,8 @@ Lock order everywhere is variants (pk order), then products (pk order), then the
 
 `change_status` is the only place a status changes: it checks `state.py`, puts the goods back on the shelf when the
 transition says so, and writes the `OrderStatusHistory` row.
+
+Both announce themselves through `signals.py` (inside their transaction) so the payments app can follow along.
 """
 from collections import defaultdict
 
@@ -32,7 +34,7 @@ from apps.catalog.models import Product, ProductVariant
 from apps.catalog.pricing import variant_prices
 from apps.core.money import ZERO, quantize_money
 
-from . import state
+from . import signals, state
 from .models import DeliveryCharge, Order, OrderItem, OrderSequence, OrderStatusHistory
 
 # What the frontend calls the payment: its form sends "cash", its labels say "cod". Both are cash on delivery.
@@ -204,7 +206,10 @@ def place_order(user=None, data=None):
         if user is not None:
             CartItem.objects.filter(user=user, variant_id__in=[variant.pk for variant, _ in lines]).delete()
 
-        order.number = next_order_number()  # last: see the module docstring
+        # Receivers (payments open the order's payment record) run BEFORE the number is taken, so the counter lock
+        # stays the very last thing: see the module docstring. They must not need `order.number`.
+        signals.order_placed.send(sender=Order, order=order)
+        order.number = next_order_number()
         order.save(update_fields=["number"])
     return order
 
@@ -226,6 +231,7 @@ def change_status(order, new_status, by=None, note=""):
         OrderStatusHistory.objects.create(
             order=locked, from_status=old, to_status=new_status, changed_by=by, note=note
         )
+        signals.order_status_changed.send(sender=Order, order=locked, old=old, new=new_status, by=by)
     order.status, order.updated_at = locked.status, locked.updated_at  # the caller's copy is up to date too
     return order
 

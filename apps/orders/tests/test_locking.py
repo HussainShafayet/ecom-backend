@@ -46,7 +46,7 @@ def test_the_number_is_taken_after_everything_else_is_written(api_client):
     assert after[0].startswith('UPDATE "orders_ordersequence"') and after[1].startswith('UPDATE "orders_order"')
 
 
-def test_cancelling_locks_the_order_then_the_variants_then_the_products():
+def test_cancelling_locks_the_order_then_the_variants_then_the_products_then_the_payment():
     product, variant = stocked("Mug", stock=5)
     other, other_variant = stocked("Other", stock=5)
     order = make_order(line(other), line(product))
@@ -54,7 +54,10 @@ def test_cancelling_locks_the_order_then_the_variants_then_the_products():
     with CaptureQueriesContext(connection) as context:
         services.change_status(order, Order.Status.CANCELLED)
 
-    order_lock, variants, products = locking_statements(context)
+    order_lock, variants, products, payment = locking_statements(context)
     assert 'FROM "orders_order"' in order_lock and " FOR UPDATE" in order_lock
     assert f'ORDER BY {VARIANTS}."id" ASC' in variants and f"FOR NO KEY UPDATE OF {VARIANTS}" in variants
     assert products.startswith(PRODUCTS_BY_PK) and " ORDER BY 1 ASC " in products
+    # The payment follows the order's status, inside the same transaction, and is locked last: nothing in the other
+    # code paths waits for a payment row while holding variants or products.
+    assert 'FROM "payments_payment"' in payment and " FOR UPDATE" in payment

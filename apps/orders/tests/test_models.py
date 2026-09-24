@@ -113,6 +113,7 @@ def test_a_line_needs_at_least_one_unit_and_no_negative_price():
 def test_deleting_an_order_takes_its_lines_and_history():
     product, variant = stocked()
     order = make_order(line(product, variant))
+    order.payments.all().delete()  # a payment PROTECTs its order (see apps/payments); without one the rest cascades
     order.delete()
     assert not OrderItem.objects.exists()
     assert not OrderStatusHistory.objects.exists()
