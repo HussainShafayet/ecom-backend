@@ -4,6 +4,7 @@ import hmac
 import logging
 import math
 import secrets
+from dataclasses import dataclass, field
 from datetime import timedelta
 
 from django.conf import settings
@@ -21,6 +22,22 @@ logger = logging.getLogger(__name__)
 MSG_INVALID_TOKEN = "Invalid or expired token. Please request a new OTP."
 
 
+@dataclass(frozen=True)
+class IssuedOTP:
+    """What the caller learns after a code was sent: the opaque `token` the client keeps.
+
+    `dev_code` is filled ONLY when a dev backend that reveals codes is active AND DEBUG is on (see
+    `_deliver`); it is None everywhere else. It lives in memory only: never stored, never in the repr.
+    """
+
+    token: str
+    dev_code: str | None = field(default=None, repr=False)
+
+    def with_dev_hint(self, message):
+        """`message`, plus the code when (and only when) it may be shown: "... [DEV] Your code is 123456."."""
+        return message if self.dev_code is None else f"{message} [DEV] Your code is {self.dev_code}."
+
+
 def _hash_token(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
@@ -35,15 +52,22 @@ def _generate_code():
 
 
 def _deliver(otp, code):
+    """Send `code`. Returns it for the response only if a dev backend reveals it and DEBUG is on, else None.
+
+    This is the single place where a code may leave the OTP service: `is True` (a truthy mock is not
+    enough) and DEBUG are checked here too, whatever the backend claims.
+    """
     try:
-        get_otp_backend().send(target=otp.target, code=code, purpose=otp.purpose)
+        backend = get_otp_backend()
+        backend.send(target=otp.target, code=code, purpose=otp.purpose)
     except Exception as exc:  # any provider failure: roll back, tell the caller to retry
         logger.error("OTP delivery failed for purpose=%s", otp.purpose, exc_info=exc)
         raise ServiceUnavailable("We could not send the OTP right now. Please try again shortly.") from exc
+    return code if getattr(backend, "reveals_code", False) is True and settings.DEBUG else None
 
 
 def start_otp(*, user, purpose, target):
-    """Create and send a new OTP for `target`. Returns the opaque token the client keeps."""
+    """Create and send a new OTP for `target`. Returns an IssuedOTP (the opaque token the client keeps)."""
     now = timezone.now()
     recent = list(
         OTPRequest.objects.filter(target=target, created_at__gte=now - timedelta(hours=1))
@@ -69,12 +93,12 @@ def start_otp(*, user, purpose, target):
             last_sent_at=now,
             expires_at=now + timedelta(seconds=settings.OTP_TTL_SECONDS),
         )
-        _deliver(otp, code)
-    return token
+        dev_code = _deliver(otp, code)
+    return IssuedOTP(token=token, dev_code=dev_code)
 
 
 def resend_otp(*, token, purposes):
-    """Send a fresh code for an existing token (also allowed after the old one expired)."""
+    """Send a fresh code for an existing token (also allowed after the old one expired). Returns an IssuedOTP."""
     now = timezone.now()
     with transaction.atomic():
         otp = (
@@ -99,8 +123,8 @@ def resend_otp(*, token, purposes):
         otp.last_sent_at = now
         otp.expires_at = now + timedelta(seconds=settings.OTP_TTL_SECONDS)
         otp.save(update_fields=["code_hash", "attempts", "resend_count", "last_sent_at", "expires_at"])
-        _deliver(otp, code)
-    return otp
+        dev_code = _deliver(otp, code)
+    return IssuedOTP(token=token, dev_code=dev_code)
 
 
 def verify_otp(*, token, code, purposes, user=None):

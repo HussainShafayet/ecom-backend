@@ -36,7 +36,7 @@ def username_in_use(username, *, exclude=None):
 
 
 def start_change_verification(*, user, field, value):
-    """Send an OTP to the NEW phone/email. Returns the opaque token."""
+    """Send an OTP to the NEW phone/email. Returns an IssuedOTP (the opaque token)."""
     return otp_service.start_otp(user=user, purpose=FIELD_PURPOSE[field], target=value)
 
 

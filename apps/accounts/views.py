@@ -52,8 +52,9 @@ class RegisterView(PublicAuthView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user, token = services.register_user(**serializer.validated_data)
-        return api_response({"token": token}, message=f"OTP sent to {mask_phone(user.phone_number)}.")
+        user, issued = services.register_user(**serializer.validated_data)
+        message = issued.with_dev_hint(f"OTP sent to {mask_phone(user.phone_number)}.")
+        return api_response({"token": issued.token}, message=message)
 
 
 class LoginView(PublicAuthView):
@@ -66,8 +67,9 @@ class LoginView(PublicAuthView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user, token = services.start_login(**serializer.validated_data)
-        return api_response({"token": token}, message=f"OTP sent to {mask_phone(user.phone_number)}.")
+        user, issued = services.start_login(**serializer.validated_data)
+        message = issued.with_dev_hint(f"OTP sent to {mask_phone(user.phone_number)}.")
+        return api_response({"token": issued.token}, message=message)
 
 
 class VerifyOTPView(PublicAuthView):
@@ -101,8 +103,8 @@ class ResendOTPView(PublicAuthView):
     def post(self, request):
         serializer = ResendOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        services.resend_auth_otp(token=serializer.validated_data["token"])
-        return api_response(None, message="A new OTP has been sent.")
+        issued = services.resend_auth_otp(token=serializer.validated_data["token"])
+        return api_response(None, message=issued.with_dev_hint("A new OTP has been sent."))
 
 
 class TokenRefreshView(PublicAuthView):
@@ -190,9 +192,9 @@ class ProfileOTPRequestView(ProfileOTPView):
         serializer = ProfileOTPRequestSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         field, value = serializer.validated_data["field"], serializer.validated_data["value"]
-        token = profile_services.start_change_verification(user=request.user, field=field, value=value)
+        issued = profile_services.start_change_verification(user=request.user, field=field, value=value)
         masked = mask_phone(value) if field == "phone_number" else mask_email(value)
-        return api_response({"token": token}, message=f"OTP sent to {masked}.")
+        return api_response({"token": issued.token}, message=issued.with_dev_hint(f"OTP sent to {masked}."))
 
 
 class ProfileOTPVerifyView(ProfileOTPView):
