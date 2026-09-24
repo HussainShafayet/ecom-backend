@@ -106,7 +106,7 @@ cleared. `title` is optional. At most 20 addresses per user (`MAX_ADDRESSES_PER_
 | `POST /accounts/favourite/` | `{product_id}` | `{success:true}` (idempotent) |
 | `PUT /accounts/favourite/` (= remove) | `{product_id}` or `[{product_id}]` | `{success:true}` |
 
-## 5. Catalog & content (public; a Bearer token is optional and only personalises `is_favourite`)  *(live: `/products/…` and `/content/shop`; `/content/pages/*` and `/content/checkout` are still to come)*
+## 5. Catalog & content (public; a Bearer token is optional and only personalises `is_favourite`)  *(live: `/products/…`, `/content/shop`, `/content/pages/*`; `/content/checkout` is still to come)*
 
 `GET /products/` query: `page, page_size, ordering, category (slug, includes child categories), brands, tags, colors,
 sizes (comma separated names), min_price, max_price (effective price), discount_type + discount_value (exact match),
@@ -166,6 +166,15 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
   registers, one lookup per page.
 - `/content/shop`: only categories, brands, tags, colours and sizes that a visible product really has;
   `price_range` is the lowest and highest price customers pay; `discounts` are the distinct (type, value) pairs.
+- `/content/pages/{page}/` (`home, newarrival, flashsale, best_selling, feature, category`; any other page is a 404).
+  Answers `{page_content: {image_sliders[], video_sliders[], left_banner, right_banner}}`; a page nobody filled in yet
+  gives empty lists and null banners, never an error. Each item has `type` (`product` | `category` | `external`),
+  `link` (the product or category **slug**, null for `external`), `external_link` (null unless `external`), `media`
+  (absolute URL), `media_type` and `caption` (`""` when empty). `order` is **1, 2, 3...** in the order the admin
+  arranged the items, not the stored number, because the frontend uses it as the React key of a slide.
+  An item is visible while it is active and its product or category is visible. A page has at most one active
+  left banner and one active right banner. Slider and left banner take an image, the video slider a video, the
+  right banner either. `external_link` is always `http(s)://`.
 - `/products/categories…` list every active category A-Z (flat, with images), the flagged variants only the flagged ones.
 
 CMS item (slider/banner): `{order, type:"product"|"category"|"external", link, external_link, media, media_type:"image"|"video", caption}`.
