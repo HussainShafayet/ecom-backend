@@ -94,7 +94,7 @@ class OrderAdmin(admin.ModelAdmin):
         "total",
     )
     inlines = (OrderItemInline, OrderStatusHistoryInline)
-    actions = ("mark_paid", "mark_shipped", "mark_delivered", "cancel_and_restock")
+    actions = ("mark_confirmed", "mark_paid", "mark_shipped", "mark_delivered", "mark_returned", "cancel_and_restock")
 
     def has_add_permission(self, request):
         return False
@@ -125,6 +125,10 @@ class OrderAdmin(admin.ModelAdmin):
         for failure in failures:
             self.message_user(request, failure, messages.ERROR)
 
+    @admin.action(description="Mark as confirmed", permissions=["change"])
+    def mark_confirmed(self, request, queryset):
+        self._change_all(request, queryset, Order.Status.CONFIRMED, "Marked as confirmed.", "marked as confirmed")
+
     @admin.action(description="Mark as paid", permissions=["change"])
     def mark_paid(self, request, queryset):
         self._change_all(request, queryset, Order.Status.PAID, "Marked as paid.", "marked as paid")
@@ -136,6 +140,16 @@ class OrderAdmin(admin.ModelAdmin):
     @admin.action(description="Mark as delivered", permissions=["change"])
     def mark_delivered(self, request, queryset):
         self._change_all(request, queryset, Order.Status.DELIVERED, "Marked as delivered.", "marked as delivered")
+
+    @admin.action(description="Mark as returned (parcel came back) and restock", permissions=["change"])
+    def mark_returned(self, request, queryset):
+        self._change_all(
+            request,
+            queryset,
+            Order.Status.RETURNED,
+            "Returned: delivery failed or was refused.",
+            "marked as returned and put back in stock",
+        )
 
     @admin.action(description="Cancel and restock", permissions=["change"])
     def cancel_and_restock(self, request, queryset):

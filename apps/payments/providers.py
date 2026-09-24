@@ -37,6 +37,12 @@ class CashOnDelivery(PaymentProvider):
             PaymentStatus.PENDING: PaymentStatus.CANCELLED,
             PaymentStatus.PAID: PaymentStatus.REFUNDED,
         },
+        # A parcel that came back was never paid for at the door; cash collected earlier (staff marked the order
+        # paid) is given back. `confirmed` and `shipped` change nothing: they are not in this table.
+        OrderStatus.RETURNED: {
+            PaymentStatus.PENDING: PaymentStatus.CANCELLED,
+            PaymentStatus.PAID: PaymentStatus.REFUNDED,
+        },
         OrderStatus.REFUNDED: {
             PaymentStatus.PENDING: PaymentStatus.CANCELLED,
             PaymentStatus.PAID: PaymentStatus.REFUNDED,

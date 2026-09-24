@@ -39,9 +39,11 @@ class Order(Timestamped):
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
+        CONFIRMED = "confirmed", "Confirmed"  # staff checked the order (a phone call, for cash on delivery)
         PAID = "paid", "Paid"
         SHIPPED = "shipped", "Shipped"
         DELIVERED = "delivered", "Delivered"
+        RETURNED = "returned", "Returned"  # shipped, but the parcel came back: delivery failed or was refused
         CANCELLED = "cancelled", "Cancelled"
         REFUNDED = "refunded", "Refunded"
 

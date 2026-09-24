@@ -58,7 +58,7 @@ WAITING_FOR_DELIVERY = "waiting_for_delivery"  # they ordered it and the order h
 NOT_PURCHASED = "not_purchased"  # signed in, but no order of theirs that is on its way or delivered contains it
 GUEST = "guest"  # not signed in
 STATUSES = (CAN_REVIEW, REVIEWED, WAITING_FOR_DELIVERY, NOT_PURCHASED, GUEST)
-ON_ITS_WAY = (Order.Status.PENDING, Order.Status.PAID, Order.Status.SHIPPED)
+ON_ITS_WAY = (Order.Status.PENDING, Order.Status.CONFIRMED, Order.Status.PAID, Order.Status.SHIPPED)
 
 
 def review_state(user, product_id):

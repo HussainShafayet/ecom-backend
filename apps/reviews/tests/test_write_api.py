@@ -1,5 +1,6 @@
 """POST /products/reviews/: what the review form sends, what comes back, and what is refused."""
 import pytest
+from django.utils.dateparse import parse_datetime
 
 from apps.catalog.models import Product
 from apps.reviews.models import Review
@@ -44,7 +45,9 @@ def test_the_created_review_has_the_shape_the_frontend_reads(shop):
         "can_edited": True,
         "media_urls": [],
     }
-    assert body["data"]["created_at"].startswith(review.created_at.strftime("%Y-%m-%dT"))
+    # the same instant: the API writes it in Dhaka time (+06:00), the database value is UTC, so their DATES differ
+    # between 00:00 and 06:00 in Dhaka (this test used to fail then)
+    assert parse_datetime(body["data"]["created_at"]) == review.created_at
 
 
 def test_the_comment_is_trimmed(shop):

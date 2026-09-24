@@ -48,6 +48,8 @@ EXPECTED = {
     (OS.DELIVERED, PS.PENDING): PS.PAID,
     (OS.CANCELLED, PS.PENDING): PS.CANCELLED,
     (OS.CANCELLED, PS.PAID): PS.REFUNDED,
+    (OS.RETURNED, PS.PENDING): PS.CANCELLED,  # a parcel that came back was never paid for at the door
+    (OS.RETURNED, PS.PAID): PS.REFUNDED,  # cash collected earlier is given back
     (OS.REFUNDED, PS.PENDING): PS.CANCELLED,
     (OS.REFUNDED, PS.PAID): PS.REFUNDED,
 }

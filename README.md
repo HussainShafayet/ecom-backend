@@ -142,8 +142,8 @@ what the code generates.
 
 Customers place orders at checkout; staff manage them in the Django admin under **Orders**. An order can neither be
 added nor deleted, and only its status can be edited (the form offers the current status and the allowed next ones; the
-list has the bulk actions Mark as paid / shipped / delivered and Cancel and restock, which puts the goods back into
-stock). **Delivery charges** are two rows, Inside Dhaka (60.00) and Outside Dhaka (120.00) by default, created by a
+list has the bulk actions Mark as confirmed / paid / shipped / delivered / returned and Cancel and restock; a
+returned parcel and a cancelled order put the goods back into stock). **Delivery charges** are two rows, Inside Dhaka (60.00) and Outside Dhaka (120.00) by default, created by a
 migration; edit the amount there (placed orders keep the amount they were charged). Order numbers look like
 `GC-20260923-0001` (`ORDER_NUMBER_PREFIX`); `THROTTLE_ORDER` limits how often one client can place orders.
 
