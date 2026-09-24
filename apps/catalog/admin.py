@@ -164,6 +164,12 @@ class ProductAdmin(admin.ModelAdmin):
             .annotate(stock_total=Sum("variants__stock_quantity"))
         )
 
+    def save_model(self, request, obj, form, change):
+        if change:
+            obj.save_without_counters()  # the shop keeps counting orders, views and reviews while the form is open
+        else:
+            super().save_model(request, obj, form, change)
+
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
         services.sync_primary_category(form.instance)

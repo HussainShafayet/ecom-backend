@@ -206,6 +206,7 @@ class Product(SluggedModel, FileCleanupModel, Timestamped):
     total_orders = models.PositiveIntegerField(default=0, editable=False)
     total_reviews = models.PositiveIntegerField(default=0, editable=False)
     avg_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0, editable=False)
+    COUNTER_FIELDS = ("total_views", "total_orders", "total_reviews", "avg_rating")
 
     qrcode_image = models.ImageField(upload_to=RandomUploadTo("qrcodes"), blank=True, editable=False)
     qrcode_target = models.CharField(max_length=500, blank=True, editable=False)  # the URL the QR code opens
@@ -260,6 +261,15 @@ class Product(SluggedModel, FileCleanupModel, Timestamped):
         if kwargs.get("update_fields") is None:
             self._refresh_qrcode()
         super().save(*args, **kwargs)
+
+    def save_without_counters(self):
+        """Save what an editor changes and leave the `COUNTER_FIELDS` columns out of the UPDATE. The shop moves the
+        counters (an order, a page view, a review) while a staff member has the form open; saving the whole row
+        would write back the values loaded a moment ago and lose those."""
+        self.ensure_slug()
+        self._refresh_qrcode()  # a save with `update_fields` skips it
+        columns = [f.name for f in self._meta.concrete_fields if not f.primary_key and f.name not in self.COUNTER_FIELDS]
+        self.save(update_fields=columns)
 
     def _refresh_qrcode(self):
         """(Re)draw the QR code when it is missing or opens an outdated URL (new slug or FRONTEND_URL)."""

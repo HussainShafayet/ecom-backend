@@ -65,6 +65,16 @@ schema together, and never diverge from what the frontend calls without the user
   right. Nothing writes those two columns by hand. `bulk_create` and `queryset.update()` send no signals: recount
   yourself. Uploads: type from the bytes (`core.validators.detect_media_format`), stored name gets the matching
   extension, API `media_urls[].type` is the MIME type.
+- Requests: `core.middleware.UploadSizeLimitMiddleware` answers a multipart upload over `MAX_UPLOAD_REQUEST_MB` with a
+  413 before reading it; `envelope_exception_handler` turns Django's `SuspiciousOperation`s (body over
+  `DATA_UPLOAD_MAX_MEMORY_SIZE`, too many fields/files) into 413/400, never a 500.
+- Throttles: every view has the generous default (`anon` / `user`); a view that lets a GUEST write must set
+  `throttle_classes = [ScopedRateThrottle]` + `throttle_scope` (a test walks the URLconf and fails otherwise). The client
+  IP comes from `NUM_PROXIES` (mandatory in prod): never read `X-Forwarded-For` yourself.
+- Product counters (`Product.COUNTER_FIELDS`: views, orders, reviews, rating) are only moved by code; the admin saves a
+  product with `save_without_counters()` so it never writes back stale ones.
+- `.env.example` lists every variable `config/settings/*.py` reads (a test checks), values without inline comments
+  (django-environ would keep the comment as part of the value).
 - Status codes matter to the frontend: bad OTP/validation/out-of-stock = 400; 401 ONLY for missing/expired/invalid
   tokens (a 401 makes the frontend try to refresh, then log the user out).
 - `apps/accounts` (and `core`) must not import shop apps (catalog/cart/orders...): this base is reused for other

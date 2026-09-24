@@ -56,3 +56,16 @@ def test_a_guest_is_refused_before_anything_is_counted_or_read(monkeypatch, api_
     product, _ = stocked("Mug")
     assert write_review(api_client, product).status_code == 401
     assert write_review(api_client, product).status_code == 401  # 401, not 429: authentication comes first
+
+
+def test_reading_reviews_is_held_to_the_default_limits_too():
+    """The review list is public; its `get_throttles` used to return nothing for a read."""
+    from types import SimpleNamespace
+
+    from apps.reviews.views import ReviewListCreateView
+
+    view = ReviewListCreateView()
+    view.request = SimpleNamespace(method="GET")
+    assert [type(throttle).__name__ for throttle in view.get_throttles()] == ["AnonRateThrottle", "UserRateThrottle"]
+    view.request = SimpleNamespace(method="POST")
+    assert [type(throttle).__name__ for throttle in view.get_throttles()] == ["ScopedRateThrottle"]

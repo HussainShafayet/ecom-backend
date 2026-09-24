@@ -95,8 +95,8 @@ stays `ConsoleOTPBackend`. Use it on your own machine only: anyone who can reach
 ### Uploaded files (profile pictures)
 
 In dev they are stored in `backend/media/` (gitignored) and served by `runserver` at `/media/...`; the API returns
-absolute URLs. JPEG/PNG/WebP up to `MAX_IMAGE_UPLOAD_MB` (5). Production storage (S3-compatible) is configured in the
-hardening step, until then use a reverse proxy/volume for `MEDIA_ROOT`.
+absolute URLs. JPEG/PNG/WebP up to `MAX_IMAGE_UPLOAD_MB` (5). In production keep them on a volume that the reverse
+proxy serves at `/media/`, or in an S3-compatible store (see "Production notes").
 
 ### Point the frontend at it
 
@@ -137,13 +137,42 @@ payment follows.
 
 ## Production notes
 
+Run `python manage.py check --deploy` with the production environment: it must say "no issues" (a test runs it).
+
 - `DJANGO_SETTINGS_MODULE=config.settings.prod`, `DEBUG` off, real `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`.
+  Move the staff login off the obvious address with `ADMIN_URL=staff-9f3k/`.
 - **`OTP_BACKEND` has no default in prod**: startup fails until you point it at a real delivery class
   (`BrowserOTPBackend`, which shows codes in API responses, is rejected).
+- **`NUM_PROXIES` has no default in prod** either: the number of reverse proxies in front of Django (nginx alone = 1,
+  a CDN in front of nginx = 2). It decides which address the throttles count: too low and every customer shares the
+  proxy's address (one limit for everybody), too high and a client chooses its own address with an
+  `X-Forwarded-For` header and dodges every limit. The proxy must append to that header
+  (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`) and pass `X-Forwarded-Proto`, with
+  `SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https` so Django knows the request was HTTPS.
 - Rate-limit counters live in a database cache shared by all workers. Create its table once:
-  `python manage.py createcachetable`
+  `python manage.py createcachetable`. Every request reads and writes one counter (the generous default limits,
+  `THROTTLE_ANON` / `THROTTLE_USER`); a busy shop may prefer `limit_req` in the proxy and very high values here.
+- **Body size.** The API refuses a multipart upload over `MAX_UPLOAD_REQUEST_MB` (default 255: five review videos of
+  50 MB and the text) with a 413 before it reads it, and any other body over `DATA_UPLOAD_MAX_MEMORY_SIZE` (2.5 MB).
+  Make the proxy stop the transfer earlier, small everywhere and large only where files are uploaded:
+
+  ```nginx
+  location /api/ { client_max_body_size 1m; proxy_pass http://gocart; }
+  location ~ ^/api/v1/(products/reviews|accounts/profile)/?  { client_max_body_size 260m; proxy_pass http://gocart; }
+  ```
+- **Static and media files.** `python manage.py collectstatic` (admin CSS) into `STATIC_ROOT` and let the proxy serve it at
+  `/static/`. Uploads are on the local disk (`MEDIA_ROOT`, served at `/media/`) unless you install
+  `django-storages[s3]` and set `MEDIA_STORAGE_BACKEND=storages.backends.s3.S3Storage` with
+  `MEDIA_STORAGE_OPTIONS={"bucket_name": "...", "endpoint_url": "...", "access_key": "...", "secret_key": "..."}`;
+  the API then returns the store's own URLs.
 - Blacklisted refresh tokens pile up. Purge expired ones regularly (cron, e.g. daily):
   `python manage.py flushexpiredtokens`
+- Logs go to the console (`LOG_LEVEL`). Only the dev-only console OTP backend prints a code and a phone number (prod
+  has no default backend); nothing else logs either. A refused request (too big, hostile) is a WARNING, an unexpected
+  error an ERROR with the traceback.
+- **Editing stock in the admin** overwrites the number the form was opened with: an order placed meanwhile is lost from
+  the stock count. Do stock corrections when the shop is quiet. (The product's own counters, orders/views/reviews/rating,
+  are left alone by an admin save.)
 
 ## Layout
 

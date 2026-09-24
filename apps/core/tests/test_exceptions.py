@@ -1,3 +1,7 @@
+import logging
+
+import pytest
+from django.core.exceptions import RequestDataTooBig, SuspiciousFileOperation, TooManyFieldsSent, TooManyFilesSent
 from django.http import Http404
 from rest_framework.exceptions import Throttled, ValidationError
 
@@ -67,3 +71,23 @@ def test_handler_unhandled_exception_is_generic_500(caplog):
     assert response.data["message"] == "Internal server error."
     assert "hunter2" not in str(response.data)
     assert "Unhandled exception" in caplog.text  # ...but the traceback is logged for us
+
+
+def test_handler_a_body_over_the_limit_is_a_413_and_no_bug(caplog):
+    with caplog.at_level(logging.WARNING):
+        response = envelope_exception_handler(RequestDataTooBig("Request body exceeded the limit."), {})
+    assert response.status_code == 413
+    assert response.data["success"] is False and response.data["message"] == "Request too large."
+    assert response.data["errors"] == ["The request is larger than the server accepts."]
+    assert not [record for record in caplog.records if record.levelno >= logging.ERROR]  # the client's doing, not a bug
+    assert "Refused a request" in caplog.text
+
+
+@pytest.mark.parametrize("exc", [TooManyFieldsSent("x"), TooManyFilesSent("x"), SuspiciousFileOperation("../../etc")])
+def test_handler_other_things_django_refuses_are_a_400_and_no_bug(exc, caplog):
+    with caplog.at_level(logging.WARNING):
+        response = envelope_exception_handler(exc, {})
+    assert response.status_code == 400
+    assert response.data["message"] == "Bad request."
+    assert "etc" not in str(response.data)  # what the client sent is never echoed back
+    assert not [record for record in caplog.records if record.levelno >= logging.ERROR]

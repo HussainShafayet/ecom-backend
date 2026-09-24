@@ -43,6 +43,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # must sit above CommonMiddleware
+    "apps.core.middleware.UploadSizeLimitMiddleware",  # below CORS: its 413 must carry the CORS headers
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -90,13 +91,30 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Uploaded files (profile pictures, ...). Dev: served from ./media by runserver. Prod: an S3-compatible
-# store is configured in a later step; the API always returns absolute URLs.
+# Uploaded files (profile pictures, reviews, ...). Dev: served from ./media by runserver. Prod: served by the reverse
+# proxy or kept in an S3-compatible store (below); the API always returns absolute URLs.
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# Where uploaded files are kept: the local MEDIA_ROOT by default. For S3 (or any S3-compatible store) install
+# `django-storages[s3]` and set, for example,
+#   MEDIA_STORAGE_BACKEND=storages.backends.s3.S3Storage
+#   MEDIA_STORAGE_OPTIONS={"bucket_name": "...", "endpoint_url": "...", "access_key": "...", "secret_key": "..."}
+# The API returns whatever URL the storage gives (absolute for S3, made absolute for the local disk).
+STORAGES = {
+    "default": {
+        "BACKEND": env("MEDIA_STORAGE_BACKEND", default="django.core.files.storage.FileSystemStorage"),
+        "OPTIONS": env.json("MEDIA_STORAGE_OPTIONS", default={}),
+    },
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
 MAX_IMAGE_UPLOAD_MB = env.int("MAX_IMAGE_UPLOAD_MB", default=5)
 MAX_VIDEO_UPLOAD_MB = env.int("MAX_VIDEO_UPLOAD_MB", default=50)
 MAX_REVIEW_FILES = env.int("MAX_REVIEW_FILES", default=5)  # photos + videos on one review
+# The most one API upload request may weigh (the biggest legitimate one: a review of MAX_REVIEW_FILES videos, plus
+# some room for the text fields). Bigger is answered with a 413 before it is read; see UploadSizeLimitMiddleware.
+MAX_UPLOAD_REQUEST_MB = env.int("MAX_UPLOAD_REQUEST_MB", default=MAX_REVIEW_FILES * MAX_VIDEO_UPLOAD_MB + 5)
+# Everything that is not an upload (JSON bodies, form fields): Django refuses more than this, see core/exceptions.py.
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DATA_UPLOAD_MAX_MEMORY_SIZE", default=2_621_440)  # Django's own default, 2.5 MB
 
 # The frontend calls both `/products` and `/products/` (and `/accounts/cart/`, ...). A 301 redirect would
 # break CORS preflights that carry an Authorization header, so URLs are registered in both forms instead
@@ -121,10 +139,22 @@ REST_FRAMEWORK = {
     # so they go over the wire as JSON numbers, not strings.
     "COERCE_DECIMAL_TO_STRING": False,
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
-    # Views opt in with throttle_classes = [ScopedRateThrottle] + throttle_scope. Rates are per client IP;
-    # many users share one IP (mobile carrier NAT), so they are generous. The tight per-phone limits live
-    # in apps.accounts.otp.service.
+    # Every view is throttled by default, generously (a safety net against a runaway script or a hammering client:
+    # a page of the shop makes ~10 calls). Views that need a tighter limit set throttle_classes =
+    # [ScopedRateThrottle] + throttle_scope, which replaces these. Rates are per client IP, and many users share one IP
+    # (mobile carrier NAT), so they are generous. The tight per-phone limits live in apps.accounts.otp.service.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    # How many reverse proxies sit between the internet and Django: 0 = the app is reached directly (dev). With a
+    # proxy the client is the address that proxy appended to X-Forwarded-For, and DRF must be told how many proxies to
+    # trust: left unset it would take the whole (client-controlled) header as the "IP", and a client could dodge every
+    # throttle by sending a new header value with each request. prod.py makes this setting mandatory.
+    "NUM_PROXIES": env.int("NUM_PROXIES", default=0),
     "DEFAULT_THROTTLE_RATES": {
+        "anon": env("THROTTLE_ANON", default="600/minute"),  # a guest, per IP
+        "user": env("THROTTLE_USER", default="1200/minute"),  # a signed-in customer
         "otp_send": env("THROTTLE_OTP_SEND", default="30/hour"),
         "otp_verify": env("THROTTLE_OTP_VERIFY", default="60/hour"),
         "token": env("THROTTLE_TOKEN", default="60/minute"),
@@ -194,6 +224,10 @@ CORS_URLS_REGEX = r"^/api/.*$"
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
+
+# Where the Django admin lives. Change it in production (`ADMIN_URL=staff-9f3k/`) so the staff login is not the first
+# thing every scanner finds. A leading slash is ignored; the trailing one is added.
+ADMIN_URL = env("ADMIN_URL", default="admin/").strip("/") + "/"
 
 LOGGING = {
     "version": 1,

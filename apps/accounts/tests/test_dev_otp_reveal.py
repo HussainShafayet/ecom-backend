@@ -317,7 +317,12 @@ def load_settings(module, **env):
         "print(json.dumps({'OTP_BACKEND': settings.OTP_BACKEND, 'DEBUG': settings.DEBUG}))\n"
     )
     clean = {k: v for k, v in os.environ.items() if k not in ("OTP_BACKEND", "DEBUG")}
-    clean.update(SECRET_KEY="x" * 50, DATABASE_URL="postgres://user:pass@127.0.0.1:5432/never_connected", **env)
+    clean.update(
+        SECRET_KEY="x" * 50,
+        DATABASE_URL="postgres://user:pass@127.0.0.1:5432/never_connected",
+        NUM_PROXIES="1",  # the production settings insist on it (see core/tests/test_prod_settings.py)
+        **env,
+    )
     return subprocess.run(
         [sys.executable, "-c", script, module],
         cwd=BACKEND_DIR, env=clean, capture_output=True, text=True, timeout=60, check=False,
