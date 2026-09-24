@@ -69,6 +69,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             "availability_status",
             "has_variants",
             "variant_id",
+            "minimum_order_quantity",
             "is_favourite",
         )
         read_only_fields = fields

@@ -540,3 +540,16 @@ def test_simultaneous_adds_can_not_pass_the_stock_together():
 
     assert sorted(statuses) == [200, 400, 400]
     assert lines(user) == [(variant.pk, 2)]
+
+
+def test_a_cart_line_carries_the_products_minimum_order_quantity():
+    """A cart line is a product card: the cart can warn about a quantity below the minimum before checkout refuses it."""
+    user, client = signed_in()
+    knives = make_product("Knife Set", minimum_order_quantity=3)
+    variant = make_variant(knives, stock_quantity=10)
+    assert add(client, knives, quantity=1, action="increase").status_code == 200  # the cart itself does not enforce it
+
+    (line,) = client.get(CART).json()["data"]
+
+    assert (line["quantity"], line["minimum_order_quantity"]) == (1, 3)
+    assert lines(user) == [(variant.pk, 1)]
