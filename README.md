@@ -101,6 +101,15 @@ python manage.py check --deploy --settings=config.settings.prod              # p
 python manage.py seed_catalog && python manage.py seed_content               # demo products, sliders and banners (dev only)
 ```
 
+## Orders (staff)
+
+Customers place orders at checkout; staff manage them in the Django admin under **Orders**. An order can neither be
+added nor deleted, and only its status can be edited (the form offers the current status and the allowed next ones; the
+list has the bulk actions Mark as paid / shipped / delivered and Cancel and restock, which puts the goods back into
+stock). **Delivery charges** are two rows, Inside Dhaka (60.00) and Outside Dhaka (120.00) by default, created by a
+migration; edit the amount there (placed orders keep the amount they were charged). Order numbers look like
+`GC-20260923-0001` (`ORDER_NUMBER_PREFIX`); `THROTTLE_ORDER` limits how often one client can place orders.
+
 ## Production notes
 
 - `DJANGO_SETTINGS_MODULE=config.settings.prod`, `DEBUG` off, real `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`.
@@ -121,11 +130,12 @@ apps/catalog/      categories, brands, products, variants, media; the public pro
 apps/content/      editable sliders and banners of the six shop pages (/content/pages/<page>/)
 apps/wishlist/     favourites (/accounts/favourite/) and the catalog's `is_favourite`
 apps/cart/         the signed-in cart (/accounts/cart/) and the merge of a guest's browser cart at sign-in
+apps/orders/       checkout: POST /orders/ (guests too), /content/checkout/, delivery charges, order status flow + admin
 docs/API_CONTRACT.md   canonical API contract (what the frontend calls)
 openapi.yaml       generated schema (keep in sync: see command above)
 ```
 
-More apps (`orders`, `payments`, `reviews`) are added step by step.
+More apps (`payments`, `reviews`) are added step by step.
 
 ## Settings
 

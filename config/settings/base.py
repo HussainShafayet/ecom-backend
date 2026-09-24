@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "apps.content",
     "apps.wishlist",
     "apps.cart",
+    "apps.orders",
 ]
 
 MIDDLEWARE = [
@@ -124,6 +125,7 @@ REST_FRAMEWORK = {
         "otp_send": env("THROTTLE_OTP_SEND", default="30/hour"),
         "otp_verify": env("THROTTLE_OTP_VERIFY", default="60/hour"),
         "token": env("THROTTLE_TOKEN", default="60/minute"),
+        "order": env("THROTTLE_ORDER", default="30/hour"),
     },
 }
 
@@ -148,6 +150,8 @@ PROFILE_VERIFICATION_WINDOW_SECONDS = env.int("PROFILE_VERIFICATION_WINDOW_SECON
 MAX_ADDRESSES_PER_USER = env.int("MAX_ADDRESSES_PER_USER", default=20)
 MAX_CART_LINES = env.int("MAX_CART_LINES", default=50)  # different products/variants in one cart
 MAX_FAVOURITES_PER_USER = env.int("MAX_FAVOURITES_PER_USER", default=200)
+# Order numbers read <prefix>-YYYYMMDD-NNNN (letters and digits only: the number goes into the confirmation URL).
+ORDER_NUMBER_PREFIX = env("ORDER_NUMBER_PREFIX", default="GC")
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env.int("JWT_ACCESS_MINUTES", default=15)),

@@ -51,8 +51,9 @@ schema together, and never diverge from what the frontend calls without the user
 - Money: `DecimalField(12, 2)` and `apps/core/money.py` only, never `float`. On the wire money is a JSON number
   (`COERCE_DECIMAL_TO_STRING=False`), because the frontend does arithmetic and `.toFixed()` on it.
 - Stock/orders: only through `orders.services.place_order()` inside `transaction.atomic()` with `select_for_update()`
-  (lock variants in id order). Order status changes only through the transition map in `orders/state.py`, always
-  writing `OrderStatusHistory`.
+  (lock variants in id order, then products, then the day's order counter). Order status changes only through
+  `orders.services.change_status()`, which checks the transition map in `orders/state.py` and always writes
+  `OrderStatusHistory`. Prices are always recomputed from the database, never taken from the request.
 - Status codes matter to the frontend: bad OTP/validation/out-of-stock = 400; 401 ONLY for missing/expired/invalid
   tokens (a 401 makes the frontend try to refresh, then log the user out).
 - `apps/accounts` (and `core`) must not import shop apps (catalog/cart/orders...): this base is reused for other

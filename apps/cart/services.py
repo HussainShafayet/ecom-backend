@@ -36,6 +36,17 @@ def buyable_variants(product_id):
     )
 
 
+def active_variants_by_product(product_ids):
+    """{product_id: [active variants, the default first]} for visible products, in one query."""
+    grouped = {}
+    variants = ProductVariant.objects.filter(
+        product_id__in=set(product_ids), is_active=True, product__is_active=True
+    ).select_related("product", "color", "size")
+    for variant in variants:  # ProductVariant's own ordering puts the default first
+        grouped.setdefault(variant.product_id, []).append(variant)
+    return grouped
+
+
 def choose_variant(variants, variant_id=None):
     """(variant, None) or (None, why not), from the active variants of ONE product."""
     if not variants:
@@ -48,7 +59,8 @@ def choose_variant(variants, variant_id=None):
     return None, "Choose a colour or size first."
 
 
-def _describe(variant):
+def describe_variant(variant):
+    """How a message names a line: Mug, or Shirt (Red / M) when the variant has options."""
     name = variant.product.name
     return f"{name} ({variant.label})" if variant.has_options else name
 
@@ -64,10 +76,10 @@ def add_to_cart(user, product_id, quantity, variant_id=None):
         current = line.quantity if line else 0
         stock = variant.stock_quantity
         if stock <= 0:
-            raise ValidationError(f"{_describe(variant)} is out of stock.")
+            raise ValidationError(f"{describe_variant(variant)} is out of stock.")
         if current + quantity > stock:
             already = f" (you already have {current} in your cart)" if current else ""
-            raise ValidationError(f"Only {stock} of {_describe(variant)} left in stock{already}.")
+            raise ValidationError(f"Only {stock} of {describe_variant(variant)} left in stock{already}.")
         if line:
             line.quantity = current + quantity
             line.save(update_fields=["quantity", "updated_at"])
@@ -162,12 +174,7 @@ def merge_guest_cart(user, items):
     if not wanted:
         return
 
-    by_product = {}
-    variants = ProductVariant.objects.filter(
-        product_id__in={product_id for product_id, _ in wanted}, is_active=True, product__is_active=True
-    ).select_related("product", "color", "size")
-    for variant in variants:  # ProductVariant's own ordering puts the default first
-        by_product.setdefault(variant.product_id, []).append(variant)
+    by_product = active_variants_by_product(product_id for product_id, _ in wanted)
 
     to_add = {}
     for (product_id, variant_id), quantity in wanted.items():
