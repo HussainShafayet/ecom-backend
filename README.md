@@ -131,6 +131,10 @@ stock). **Delivery charges** are two rows, Inside Dhaka (60.00) and Outside Dhak
 migration; edit the amount there (placed orders keep the amount they were charged). Order numbers look like
 `GC-20260923-0001` (`ORDER_NUMBER_PREFIX`); `THROTTLE_ORDER` limits how often one client can place orders.
 
+Every order also has a **payment** (cash on delivery: pending when placed, paid when the order is delivered or marked
+paid, cancelled or refunded when the order is). Staff see them, read-only, under **Payments**; move the order and the
+payment follows.
+
 ## Production notes
 
 - `DJANGO_SETTINGS_MODULE=config.settings.prod`, `DEBUG` off, real `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`.
@@ -153,6 +157,7 @@ apps/content/      editable sliders and banners of the six shop pages (/content/
 apps/wishlist/     favourites (/accounts/favourite/) and the catalog's `is_favourite`
 apps/cart/         the signed-in cart (/accounts/cart/) and the merge of a guest's browser cart at sign-in
 apps/orders/       checkout: POST /orders/ (guests too), /content/checkout/, delivery charges, order status flow + admin
+apps/payments/     the payment of each order (cash on delivery), following the order's status; provider interface
 docs/API_CONTRACT.md   canonical API contract (what the frontend calls)
 openapi.yaml       generated schema (keep in sync: see command above)
 ```

@@ -304,6 +304,25 @@ order is **cancelled** (from `pending`, `paid` or `shipped`) or a **`paid` order
 that is refunded is not restocked**: the goods already left, and whether they come back sellable is for a person to
 decide (edit the stock in the admin). Cancelling twice is impossible, so goods are never returned twice.
 
+**Payments** (no endpoint: the frontend offers cash on delivery only, so nothing is exposed to it). Every order gets one
+`Payment` row in the same transaction that places it (`pending`, amount = the order total, method `cod`), and the
+payment follows the order's status through the orders app's signals, also inside one transaction: a failure on either
+side rolls both back.
+
+| The order becomes | A `pending` payment becomes | A `paid` payment becomes |
+|---|---|---|
+| `paid` (staff marked it) | `paid` | (unchanged) |
+| `shipped` | (unchanged: nothing is collected yet) | (unchanged) |
+| `delivered` (the courier collected the cash) | `paid` | (unchanged) |
+| `cancelled` | `cancelled` | `refunded` |
+| `refunded` | `cancelled` | `refunded` |
+
+Payment statuses: `pending -> paid | cancelled`, `paid -> refunded`; `cancelled` and `refunded` are final. `paid_at` and
+`refunded_at` are stamped once. The staff see the ledger (read-only) under **Payments** in the Django admin; they move
+the ORDER and the payment follows. A refund only records that the shop gave the money back; it does not move money.
+Orders placed before the payments app existed get their payment from a data migration. A gateway later is a new
+`PaymentProvider` in `apps/payments/providers.py`.
+
 **Proposed (needs frontend changes + approval, not part of the frozen contract):** `GET /orders/`,
 `GET /orders/{order_id}/`, `POST /orders/{id}/cancel/`.
 
