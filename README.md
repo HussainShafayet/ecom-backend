@@ -117,10 +117,26 @@ Always from the backend folder with the virtualenv active.
 pytest                                                           # all tests
 pytest apps/core -q                                              # one app
 python manage.py makemigrations && python manage.py migrate
-python manage.py spectacular --file openapi.yaml --validate --fail-on-warn   # regenerate + validate schema
+python manage.py spectacular --file openapi.yaml --validate --fail-on-warn   # regenerate + validate schema (a test fails when it is stale)
+python scripts/e2e_smoke.py                                                  # a whole customer visit against the running dev server
 python manage.py check --deploy --settings=config.settings.prod              # production readiness (needs prod env vars)
 python manage.py seed_catalog && python manage.py seed_content               # demo products, sliders and banners (dev only)
 ```
+
+### Smoke test: the whole shop against a running server
+
+`python scripts/e2e_smoke.py` replays one customer's visit the way the React shop makes it (dev server running, with
+`OTP_BACKEND=...BrowserOTPBackend` in `.env` so the script can read the OTP): browse as a guest, guest order, sign up
+with the OTP and a guest cart, profile picture and e-mail change, addresses, cart, wishlist, checkout, delivery
+(the one staff step), a review with a photo and a video, token refresh and logout. It checks the envelope and the CORS
+header of every response and that every call of the frontend (`config/frontend_calls.py`) was made, then puts back
+every row, counter and file it touched. Run it after changing an endpoint, a serializer or the settings; it takes
+seconds. Add `--server` / `--origin` if your ports differ. Dev database only (it refuses to run with `DEBUG` off).
+
+When the frontend gains or changes an API call: add it to `config/frontend_calls.py`, document it in
+`docs/API_CONTRACT.md`, regenerate `openapi.yaml`. `config/tests` fail until each of those is done: every call must
+reach a real view (with and without its trailing slash) and be in `openapi.yaml`, and `openapi.yaml` must be exactly
+what the code generates.
 
 ## Orders (staff)
 
@@ -177,7 +193,8 @@ Run `python manage.py check --deploy` with the production environment: it must s
 ## Layout
 
 ```
-config/            settings/{base,dev,prod}.py, urls.py, api_urls.py (everything under /api/v1/)
+config/            settings/{base,dev,prod}.py, urls.py, api_urls.py (everything under /api/v1/), frontend_calls.py, tests/
+scripts/           e2e_smoke.py: a whole customer visit against the running dev server
 apps/core/         response envelope, error handling, pagination, money helpers, URL helper, health check
 apps/accounts/     custom phone User, OTP register/login, JWT refresh/logout, profile (+ OTP-verified phone/email change, picture)
 apps/addresses/    saved shipping addresses (shop-specific, not part of the template base)
@@ -189,7 +206,7 @@ apps/orders/       checkout: POST /orders/ (guests too), /content/checkout/, del
 apps/payments/     the payment of each order (cash on delivery), following the order's status; provider interface
 apps/reviews/      product reviews (/products/reviews/): only after a delivered order, photos/videos, the product's rating
 docs/API_CONTRACT.md   canonical API contract (what the frontend calls)
-openapi.yaml       generated schema (keep in sync: see command above)
+openapi.yaml       generated schema; `config/tests` fail when it is not what the code generates
 ```
 
 ## Settings

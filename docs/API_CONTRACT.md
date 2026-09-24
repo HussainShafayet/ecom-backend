@@ -4,8 +4,9 @@ Canonical contract between the React frontend (`../ecom`) and this backend. It m
 sends and reads today. **Anything that would require a frontend change is marked "proposed" and needs the
 user's approval first.**
 
-Implementation status is tracked in the plan; sections marked *(live)* are implemented (health, auth, profile,
-addresses, cart, wishlist, catalog, content, orders so far).
+Every endpoint below is implemented. `config/frontend_calls.py` lists each call the frontend makes (as it spells it);
+`config/tests` check that every one of them reaches a view and is in `openapi.yaml`, and `scripts/e2e_smoke.py` replays
+them against a running server.
 
 - **Base URL:** `{API_ROOT}/` = `http://localhost:8000/api/v1/`. The frontend's `VITE_BASE_URL` must **end with `/`**.
 - **Slashes:** every route answers both with and without a trailing slash, with no redirect. The slash form is canonical.
