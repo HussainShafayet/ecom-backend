@@ -424,7 +424,8 @@ def test_a_guest_never_triggers_a_favourites_lookup(api_client, favourite_provid
     assert favourite_provider.calls == []
 
 
-def test_without_a_wishlist_app_nobody_has_favourites():
+def test_without_any_provider_nobody_has_favourites(monkeypatch):
+    monkeypatch.setattr(favourites, "_providers", [])
     make_product("P")
     assert favourites.favourite_product_ids(verified_user(), [1, 2]) == frozenset()
 

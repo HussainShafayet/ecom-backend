@@ -93,7 +93,7 @@ Location values are plain names (from the frontend's static `location.js`). `shi
 `inside_dhaka` requires `area`, `outside_dhaka` requires `division`, `district`, `thana`; fields that do not apply are
 cleared. `title` is optional. At most 20 addresses per user (`MAX_ADDRESSES_PER_USER`). Someone else's address is a `404`.
 
-## 4. Cart & wishlist (auth required)
+## 4. Cart & wishlist (auth required)  *(live)*
 
 `variant_id` missing and the product has exactly one (default) variant → that variant; several variants → 400.
 
@@ -105,6 +105,35 @@ cleared. `title` is optional. At most 20 addresses per user (`MAX_ADDRESSES_PER_
 | `GET /accounts/favourite/` | | array of product-list items |
 | `POST /accounts/favourite/` | `{product_id}` | `{success:true}` (idempotent) |
 | `PUT /accounts/favourite/` (= remove) | `{product_id}` or `[{product_id}]` | `{success:true}` |
+
+**How the cart and the wishlist behave**
+
+- A cart line is a **variant** (one per user and variant). A product with several variants and no `variant_id` is a 400
+  ("Choose a colour or size first."); a variant that is not the product's, is inactive, or a product that is hidden or
+  has no variants is a 400 ("... is not available."). `variant_id: null` counts as missing.
+- `POST` adds a **delta** (`quantity` defaults to 1, `action` to `increase`). Asking for more than the stock is a
+  **400** ("Only 3 of Mug left in stock (you already have 2 in your cart).", "Mug is out of stock.") and changes
+  nothing; nothing is reserved, stock is taken when the order is placed. `decrease` takes it off; 0 or less deletes the
+  line; a line that is not there is a harmless no-op. The number of lines is limited (`MAX_CART_LINES`, default 50).
+- The **minimum order quantity is not checked in the cart** (the frontend cart does not enforce it either): it is
+  checked when the order is placed.
+- `PUT` removes: one `{product_id, variant_id?}` or an array of them (at most 200); without `variant_id` every line of
+  that product goes; what is not in the cart is ignored. Both answer `{success: true, data: null}`.
+- `GET /accounts/cart/` is a plain array (not paginated), oldest line first; growing a line does not move it. Each entry is a product card (section 5)
+  with the **chosen variant's** `base_price` / `discount_price` / `has_discount` / `variant_id` / `availability_status`,
+  the chosen colour's picture as `image` (else the main one) and `quantity`, `color_name`, `color_hex_code`,
+  `size_name` (null when the variant has none). `id` is the **product** id; a product with two variants in the cart
+  appears twice. Lines whose product or variant is hidden are left out (and come back when it is visible again).
+- `GET /accounts/favourite/` is a plain array of product cards, newest favourite first, each with `is_favourite: true`;
+  hidden products are left out. `POST` is idempotent; `PUT` takes one `{product_id}` or an array (at most 500) and
+  ignores what was never saved. At most `MAX_FAVOURITES_PER_USER` (default 200); saving a product that is already
+  saved never counts against it.
+- **Guest merge at sign-in**: `POST /accounts/verify-otp/` may carry the guest's `cart: [{product_id, quantity,
+  variant_id?}]` and `favorite: [{product_id}]` (sic). They are added to the account's own; the merge never fails a
+  sign-in: an unusable entry is skipped (not a dict, bad numbers, unknown or hidden product, a variant of another
+  product, several variants and none named), the same variant twice is added up, the total is **capped at the stock**
+  (an out-of-stock variant is skipped), the line and favourite limits are respected, and only the first 200 / 500
+  entries are read.
 
 ## 5. Catalog & content (public; a Bearer token is optional and only personalises `is_favourite`)  *(live: `/products/…`, `/content/shop`, `/content/pages/*`; `/content/checkout` is still to come)*
 
@@ -162,8 +191,8 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
   order); `image` in the list is that same image. A video's `thumbnail_url` is null unless a poster was uploaded.
   `dimension` is null when no measure is set; `discount_type` is null when there is no discount.
 - Every successful detail request adds one to `total_views`; the response already shows the new value.
-- `is_favourite` is always false until the wishlist exists (step 7); it is filled by a provider that the wishlist app
-  registers, one lookup per page.
+- `is_favourite` is true for the signed-in customer's favourites (section 4) and false for guests; the wishlist app
+  registers a provider with the catalog, one lookup per page.
 - `/content/shop`: only categories, brands, tags, colours and sizes that a visible product really has;
   `price_range` is the lowest and highest price customers pay; `discounts` are the distinct (type, value) pairs.
 - `/content/pages/{page}/` (`home, newarrival, flashsale, best_selling, feature, category`; any other page is a 404).

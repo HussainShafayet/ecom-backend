@@ -119,11 +119,13 @@ apps/accounts/     custom phone User, OTP register/login, JWT refresh/logout, pr
 apps/addresses/    saved shipping addresses (shop-specific, not part of the template base)
 apps/catalog/      categories, brands, products, variants, media; the public product/category API and /content/shop
 apps/content/      editable sliders and banners of the six shop pages (/content/pages/<page>/)
+apps/wishlist/     favourites (/accounts/favourite/) and the catalog's `is_favourite`
+apps/cart/         the signed-in cart (/accounts/cart/) and the merge of a guest's browser cart at sign-in
 docs/API_CONTRACT.md   canonical API contract (what the frontend calls)
 openapi.yaml       generated schema (keep in sync: see command above)
 ```
 
-More apps (`cart`, `orders`, `payments`, `reviews`) are added step by step.
+More apps (`orders`, `payments`, `reviews`) are added step by step.
 
 ## Settings
 
