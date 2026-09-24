@@ -58,6 +58,13 @@ schema together, and never diverge from what the frontend calls without the user
   the `orders.signals` (`order_placed`, `order_status_changed`, sent with `send()` inside the order's transaction so a
   failure rolls both back). `orders` never imports `payments`. `order_placed` receivers run before the order number
   exists and must not use it (do e-mail/SMS in `transaction.on_commit`).
+- Reviews: written only through `reviews.services.create_review()` / `update_review()` (needs a DELIVERED order of the
+  customer containing the product; one per customer and product). The product's `total_reviews` / `avg_rating` are
+  derived data: `refresh_product_rating()` recounts them from the approved reviews (locking the product row first),
+  and the `post_save` / `post_delete` receivers of `Review` call it, so the API, the admin and cascades all keep it
+  right. Nothing writes those two columns by hand. `bulk_create` and `queryset.update()` send no signals: recount
+  yourself. Uploads: type from the bytes (`core.validators.detect_media_format`), stored name gets the matching
+  extension, API `media_urls[].type` is the MIME type.
 - Status codes matter to the frontend: bad OTP/validation/out-of-stock = 400; 401 ONLY for missing/expired/invalid
   tokens (a 401 makes the frontend try to refresh, then log the user out).
 - `apps/accounts` (and `core`) must not import shop apps (catalog/cart/orders...): this base is reused for other

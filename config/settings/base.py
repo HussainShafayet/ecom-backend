@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.cart",
     "apps.orders",
     "apps.payments",
+    "apps.reviews",
 ]
 
 MIDDLEWARE = [
@@ -95,6 +96,7 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 MAX_IMAGE_UPLOAD_MB = env.int("MAX_IMAGE_UPLOAD_MB", default=5)
 MAX_VIDEO_UPLOAD_MB = env.int("MAX_VIDEO_UPLOAD_MB", default=50)
+MAX_REVIEW_FILES = env.int("MAX_REVIEW_FILES", default=5)  # photos + videos on one review
 
 # The frontend calls both `/products` and `/products/` (and `/accounts/cart/`, ...). A 301 redirect would
 # break CORS preflights that carry an Authorization header, so URLs are registered in both forms instead
@@ -127,6 +129,7 @@ REST_FRAMEWORK = {
         "otp_verify": env("THROTTLE_OTP_VERIFY", default="60/hour"),
         "token": env("THROTTLE_TOKEN", default="60/minute"),
         "order": env("THROTTLE_ORDER", default="30/hour"),
+        "review": env("THROTTLE_REVIEW", default="30/hour"),  # per signed-in customer: writing or editing a review
     },
 }
 

@@ -1,8 +1,24 @@
+from collections import namedtuple
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from PIL import Image, UnidentifiedImageError
 
-ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
+# What a sniffed upload is: 'image' or 'video', its MIME type, and the file extension that goes with it.
+MediaFormat = namedtuple("MediaFormat", ["kind", "mime", "extension"])
+IMAGE_MEDIA = {
+    "JPEG": MediaFormat("image", "image/jpeg", "jpg"),
+    "PNG": MediaFormat("image", "image/png", "png"),
+    "WEBP": MediaFormat("image", "image/webp", "webp"),
+}
+ALLOWED_IMAGE_FORMATS = set(IMAGE_MEDIA)
+MP4 = MediaFormat("video", "video/mp4", "mp4")
+WEBM = MediaFormat("video", "video/webm", "webm")
+# HEIC / HEIF / AVIF photos (some phones save them) sit in the same `ftyp` container as MP4, but no browser shows
+# them: they are refused, not stored as a video that can not play.
+IMAGE_BRANDS = frozenset(
+    {b"heic", b"heix", b"heim", b"heis", b"hevc", b"hevx", b"hevm", b"hevs", b"mif1", b"msf1", b"avif", b"avis"}
+)
 
 
 def validate_image_upload(file):
@@ -18,18 +34,20 @@ def validate_image_upload(file):
         raise ValidationError("Unsupported image type. Use JPEG, PNG or WebP.", code="image_type")
 
 
-def detect_media_type(file):
-    """'image' or 'video' from the file's bytes (never its name or the browser's content type), else None.
+def detect_media_format(file):
+    """`MediaFormat(kind, mime, extension)` from the file's bytes (never its name or the browser's content type),
+    else None.
 
-    Images: what Pillow can decode as JPEG/PNG/WebP. Videos: MP4 (an `ftyp` box) or WebM (EBML header).
+    Images: what Pillow can decode as JPEG/PNG/WebP. Videos: MP4 (an `ftyp` box, except the HEIC/AVIF photo brands)
+    or WebM (EBML header).
     """
     file.seek(0)
     head = file.read(12)
     file.seek(0)
     if len(head) >= 8 and head[4:8] == b"ftyp":
-        return "video"
+        return None if head[8:12] in IMAGE_BRANDS else MP4
     if head[:4] == b"\x1a\x45\xdf\xa3":
-        return "video"
+        return WEBM
     try:
         with Image.open(file) as image:
             image_format = image.format
@@ -37,7 +55,13 @@ def detect_media_type(file):
         return None
     finally:
         file.seek(0)
-    return "image" if image_format in ALLOWED_IMAGE_FORMATS else None
+    return IMAGE_MEDIA.get(image_format)
+
+
+def detect_media_type(file):
+    """'image' or 'video' from the file's bytes, else None (see `detect_media_format`)."""
+    media = detect_media_format(file)
+    return media.kind if media else None
 
 
 def validate_media_upload(file):
