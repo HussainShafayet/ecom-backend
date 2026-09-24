@@ -328,13 +328,31 @@ Orders placed before the payments app existed get their payment from a data migr
 
 ## 7. Reviews
 
-- `GET /products/reviews/?product_id=` → `data:{results:[Review], can_review}`. `can_review` = the authenticated user has a
-  **delivered** order containing the product and has not reviewed it yet.
-- `POST /products/reviews/` (multipart: `product_id, rating (1-5), comment, media[]`) → the created Review; 400 if not eligible.
-- `PUT /products/reviews/{id}/` (multipart) → owner only. Non-file `media` values (the frontend re-sends existing media
-  objects as `"[object Object]"`) are ignored.
-- `Review = {id, product_id, user_name, rating, comment, created_at, can_edited, media_urls:[{file, type?}]}`.
-- Upload limits (configurable): image ≤ 5 MB (jpeg/png/webp), video ≤ 50 MB (mp4/webm), ≤ 5 files.
+- `GET /products/reviews/?product_id=` (public; a valid Bearer token fills in `can_review` and `can_edited`; an
+  expired one is a 401) → `data:{count, next, previous, results:[Review], can_review}`. Newest first, paginated like
+  the product lists (`?page=&page_size=`, 30 per page, at most 120; a page past the end is an empty `results`).
+  `can_review` = the signed-in customer has a **delivered** order containing the product and has not reviewed it yet
+  (always `false` for a guest). A missing or non-numeric `product_id` is a 400, an unknown or hidden product a 404.
+- `POST /products/reviews/` (multipart or JSON: `product_id, rating (1-5, whole), comment, media[]`; signed in) → `201`,
+  `data` = the created Review. A `400` when the product is not available, when the customer already reviewed it
+  (`You have already reviewed this product. Edit your review instead.`), or when no delivered order of theirs contains
+  it (`You can review a product once an order that contains it has been delivered.`). The comment is trimmed, must not
+  be empty and has at most 2000 characters. The review is shown at once (no approval step).
+- `PUT /products/reviews/{id}/` (multipart; signed in) → `200`, `data` = the updated Review. Every field is optional;
+  `product_id` may only repeat the review's own. Only the author: someone else's review, a hidden one, or an unknown
+  id is a `404`. **New files are added to the review's media** (5 in all, existing ones count); text values under `media`
+  (the frontend re-sends the existing media objects as `"[object Object]"`) are ignored, so an edit never removes media.
+- `Review = {id, product_id, user_name, rating, comment, created_at, can_edited, media_urls:[{file, type}]}`.
+  `user_name` is the author's name (`"Customer"` if empty), never their phone number or e-mail. `can_edited` is true for
+  the signed-in author. `media_urls[].file` is an absolute URL whose extension matches the file's real type
+  (`jpg|png|webp|mp4|webm`); `type` is its MIME type (`image/jpeg`, `video/mp4`, ...), what `<source type=...>` needs.
+- Upload limits (configurable): image ≤ 5 MB (jpeg/png/webp), video ≤ 50 MB (mp4/webm), ≤ 5 files per review. The type is
+  read from the file's bytes, not its name. A bad file is a `400` with `field_errors.media = ["<file name>: <reason>"]`
+  and nothing is saved.
+- Writes are throttled per customer (`THROTTLE_REVIEW`, default 30/hour, writing and editing share it); reading is not.
+- The product's `total_reviews` and `avg_rating` (two decimals, half up) count the approved reviews and are updated
+  in the same transaction as the review. The staff can hide a review in the Django admin (it then leaves the list and
+  the rating, and its author can no longer edit it) or delete it.
 
 ## 8. Other
 

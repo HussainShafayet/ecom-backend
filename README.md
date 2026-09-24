@@ -158,11 +158,10 @@ apps/wishlist/     favourites (/accounts/favourite/) and the catalog's `is_favou
 apps/cart/         the signed-in cart (/accounts/cart/) and the merge of a guest's browser cart at sign-in
 apps/orders/       checkout: POST /orders/ (guests too), /content/checkout/, delivery charges, order status flow + admin
 apps/payments/     the payment of each order (cash on delivery), following the order's status; provider interface
+apps/reviews/      product reviews (/products/reviews/): only after a delivered order, photos/videos, the product's rating
 docs/API_CONTRACT.md   canonical API contract (what the frontend calls)
 openapi.yaml       generated schema (keep in sync: see command above)
 ```
-
-More apps (`payments`, `reviews`) are added step by step.
 
 ## Settings
 
