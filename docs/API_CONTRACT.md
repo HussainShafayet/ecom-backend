@@ -106,7 +106,7 @@ cleared. `title` is optional. At most 20 addresses per user (`MAX_ADDRESSES_PER_
 | `POST /accounts/favourite/` | `{product_id}` | `{success:true}` (idempotent) |
 | `PUT /accounts/favourite/` (= remove) | `{product_id}` or `[{product_id}]` | `{success:true}` |
 
-## 5. Catalog & content (public; a Bearer token is optional and only personalises `is_favourite`)
+## 5. Catalog & content (public; a Bearer token is optional and only personalises `is_favourite`)  *(live: `/products/…` and `/content/shop`; `/content/pages/*` and `/content/checkout` are still to come)*
 
 `GET /products/` query: `page, page_size, ordering, category (slug, includes child categories), brands, tags, colors,
 sizes (comma separated names), min_price, max_price (effective price), discount_type + discount_value (exact match),
@@ -134,6 +134,39 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
 | `GET /content/pages/{home,newarrival,flashsale,best_selling,feature,category}/` | `{page_content:{image_sliders[], video_sliders[], left_banner, right_banner}}` |
 | `GET /content/shop/` | `{categories:[{name,slug,children[]}], brands:[name], tags:[name], colors:[{name,hex_code}], sizes:[name], price_range:{min_range,max_range}, discounts:[{discount_type,value}]}` |
 | `GET /content/checkout/` | `{delivery_charges:{inside_dhaka, outside_dhaka}` (numbers)`, shipping_addresses:[Address]` (guest: `[]`)`, user_info:{name,phone_number,email}` (guest: `null`)`}` |
+
+**How the catalog behaves**
+
+- Only active products (and active categories) are visible; anything else is a 404 on the detail page and absent from
+  every list.
+- **Prices on a card and in filters are those of the variant the card adds to the cart**: the default active variant
+  (`is_default`, else the lowest id), with its own `base_price` / `discount_price` when it overrides the product's, else
+  the product's discount rule. A product without variants uses its own price. `variant_id` is that variant.
+  `has_variants` is true only when a colour or size has to be chosen (then the card opens the detail page).
+- `min_price` / `max_price` (inclusive) compare with what the customer pays (`discount_price`). `ordering=price` sorts by
+  `base_price` (before the discount), `discount_price` by what the customer pays, `rating` by `avg_rating`. Equal values
+  fall back to newest first, so pages never repeat a product.
+- Filters: different parameters narrow the result (AND), several comma separated values of one parameter widen it (OR,
+  case-insensitive). `colors` + `sizes` must match the **same** variant. `discount_type` + `discount_value` are an exact
+  match of the product's discount (the pairs offered by `/content/shop`). `search`: every word must appear in the name,
+  SKU, model, brand name or a tag. Blank values (`?min_price=`) and unknown keys are ignored; a malformed value
+  (`ordering=x`, `min_price=abc`) is a 400 with `field_errors`.
+- `/products/new-arrivals|best-selling|flash-sale|featured` list the products the admin flagged (best selling: most
+  orders first, the others newest first) and take only `page`, `page_size`.
+- A page past the end is an empty `results` list, not a 404.
+- **Detail** `colors` / `sizes` are **left out** (not `[]`) when they do not apply: the frontend tests `!product.colors`.
+  Colours come with the default variant's colour first, sizes in size order. A colour sold without sizes has `sizes: []`
+  and carries its own `variant_id`, `base_price`, `discount_price`, `availability_status`. Only active variants are
+  offered. `media_files` is the shared gallery when the product has colours (each colour has its own, falling back to the
+  shared one) and every file otherwise. `thumbnail` is the main image's thumbnail (the first shared image, then the admin's
+  order); `image` in the list is that same image. A video's `thumbnail_url` is null unless a poster was uploaded.
+  `dimension` is null when no measure is set; `discount_type` is null when there is no discount.
+- Every successful detail request adds one to `total_views`; the response already shows the new value.
+- `is_favourite` is always false until the wishlist exists (step 7); it is filled by a provider that the wishlist app
+  registers, one lookup per page.
+- `/content/shop`: only categories, brands, tags, colours and sizes that a visible product really has;
+  `price_range` is the lowest and highest price customers pay; `discounts` are the distinct (type, value) pairs.
+- `/products/categories…` list every active category A-Z (flat, with images), the flagged variants only the flagged ones.
 
 CMS item (slider/banner): `{order, type:"product"|"category"|"external", link, external_link, media, media_type:"image"|"video", caption}`.
 All media URLs are absolute.
