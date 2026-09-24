@@ -33,14 +33,26 @@ def visible_products():
     return Product.objects.filter(is_active=True)
 
 
+def _main_image_rows():
+    """A product's images, best first (for a subquery on Product): shared (no colour) images first, then the admin's
+    order. The first row is its main image."""
+    return ProductMedia.objects.filter(product=OuterRef("pk"), file_type=ProductMedia.FileType.IMAGE).order_by(
+        F("color").asc(nulls_first=True), "order", "id"
+    )
+
+
+def main_images(product_ids):
+    """`{product_id: stored file name of its main image}` in one query; a product without an image is missing."""
+    first_image = Subquery(_main_image_rows().values("file")[:1])
+    rows = Product.objects.filter(pk__in=set(product_ids)).annotate(main_image=first_image)
+    return {pk: name for pk, name in rows.values_list("pk", "main_image") if name}
+
+
 def with_list_fields(queryset):
     """Annotate what a product card needs, so a whole page costs one query (plus one for the count)."""
     active_variants = ProductVariant.objects.filter(product=OuterRef("pk"), is_active=True)
     default_variant = active_variants.order_by("-is_default", "id")
-    # The main image: shared (no colour) images first, then the admin's order.
-    main_image = ProductMedia.objects.filter(
-        product=OuterRef("pk"), file_type=ProductMedia.FileType.IMAGE
-    ).order_by(F("color").asc(nulls_first=True), "order", "id")
+    main_image = _main_image_rows()
 
     queryset = queryset.select_related("brand", "primary_category").annotate(
         list_variant_id=Subquery(default_variant.values("id")[:1]),

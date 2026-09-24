@@ -51,13 +51,38 @@ def delivered_items(user, product_id):
     return OrderItem.objects.filter(order__user=user, order__status=Order.Status.DELIVERED, product_id=product_id)
 
 
+# Where a customer stands with a product, so the shop can say WHY they may not review it (not just "no").
+CAN_REVIEW = "can_review"  # a delivered order of theirs contains it and they have not reviewed it yet
+REVIEWED = "reviewed"  # they have (a review the staff hid counts: it can not be written again)
+WAITING_FOR_DELIVERY = "waiting_for_delivery"  # they ordered it and the order has not been delivered yet
+NOT_PURCHASED = "not_purchased"  # signed in, but no order of theirs that is on its way or delivered contains it
+GUEST = "guest"  # not signed in
+STATUSES = (CAN_REVIEW, REVIEWED, WAITING_FOR_DELIVERY, NOT_PURCHASED, GUEST)
+ON_ITS_WAY = (Order.Status.PENDING, Order.Status.PAID, Order.Status.SHIPPED)
+
+
+def review_state(user, product_id):
+    """`(status, order_number)`: one of `STATUSES`, and for WAITING_FOR_DELIVERY the number of the newest order the
+    customer is waiting for (so the page can link to it), else None. A cancelled or refunded order counts for nothing.
+    Costs at most three small queries, and one for a guest none."""
+    if not user.is_authenticated:
+        return GUEST, None
+    if Review.objects.filter(user=user, product_id=product_id).exists():
+        return REVIEWED, None
+    if delivered_items(user, product_id).exists():
+        return CAN_REVIEW, None
+    waiting = (
+        OrderItem.objects.filter(order__user=user, order__status__in=ON_ITS_WAY, product_id=product_id)
+        .order_by("-order__created_at", "-id")
+        .values_list("order__number", flat=True)
+        .first()
+    )
+    return (WAITING_FOR_DELIVERY, waiting) if waiting else (NOT_PURCHASED, None)
+
+
 def can_review(user, product_id):
     """True for a signed-in customer who received the product and has not reviewed it yet."""
-    if not user.is_authenticated:
-        return False
-    if Review.objects.filter(user=user, product_id=product_id).exists():
-        return False
-    return delivered_items(user, product_id).exists()
+    return review_state(user, product_id)[0] == CAN_REVIEW
 
 
 # --- writing ----------------------------------------------------------------------------------------------------

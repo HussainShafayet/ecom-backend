@@ -1273,6 +1273,47 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/orders/:
+    get:
+      operationId: orders_list
+      description: Only the signed-in customer's own orders (a guest order belongs
+        to nobody). Paginated like the product lists (`?page=&page_size=`).
+      summary: My orders, newest first
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OrderPage'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     post:
       operationId: orders_create
       description: 'Prices and totals in the body are ignored: the server prices every
@@ -1317,6 +1358,157 @@ paths:
                     example: OK
                   data:
                     $ref: '#/components/schemas/OrderPlaced'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/orders/{number}/:
+    get:
+      operationId: orders_retrieve
+      description: Somebody else's order, a guest order and an unknown number are
+        all a 404.
+      summary: 'One of my orders: items, address, totals, payment and status history'
+      parameters:
+      - in: path
+        name: number
+        schema:
+          type: string
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OrderDetail'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/orders/{number}/cancel/:
+    post:
+      operationId: orders_cancel_create
+      description: 'The goods go back into stock and the payment is cancelled. An
+        order that is already paid, shipped, delivered, cancelled or refunded is a
+        400: a person has to handle it. Answers with the order.'
+      summary: Cancel my order (only while it is pending)
+      parameters:
+      - in: path
+        name: number
+        schema:
+          type: string
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OrderDetail'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/orders/track/:
+    get:
+      operationId: orders_track_retrieve
+      description: 'Progress and contents only: not the name, address, phone or e-mail.
+        A wrong number or phone is the same 404 (`No order matches these details.`).
+        Rate limited per client IP, misses count too.'
+      summary: Track an order by its number and phone number (guests too)
+      parameters:
+      - in: query
+        name: order_id
+        schema:
+          type: string
+        description: e.g. GC-20260923-0001 (any case).
+        required: true
+      - in: query
+        name: phone_number
+        schema:
+          type: string
+        description: +880 and 10 digits, as at checkout.
+        required: true
+      tags:
+      - orders
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OrderTracking'
           description: ''
         4XX:
           description: Error envelope
@@ -2753,6 +2945,176 @@ components:
           description: Opaque URL-safe token; send it back with the OTP.
       required:
       - token
+    OrderDetail:
+      type: object
+      description: One of the customer's own orders, in full.
+      properties:
+        order_id:
+          type: string
+          description: e.g. GC-20260923-0001; use it in /orders/{order_id}/.
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        status_display:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        total:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        items_count:
+          type: integer
+          readOnly: true
+          description: 'Units, not lines: two of one product and one of another is
+            3.'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+          readOnly: true
+        name:
+          type: string
+          maxLength: 150
+        email:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          maxLength: 14
+        shipping_type:
+          $ref: '#/components/schemas/ShippingTypeEnum'
+        shipping_area:
+          type: string
+          maxLength: 100
+        shipping_division:
+          type: string
+          maxLength: 100
+        shipping_district:
+          type: string
+          maxLength: 100
+        shipping_thana:
+          type: string
+          maxLength: 100
+        shipping_address:
+          type: string
+          maxLength: 500
+        subtotal:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        delivery_charge:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        payment:
+          allOf:
+          - $ref: '#/components/schemas/OrderPayment'
+          nullable: true
+          readOnly: true
+          description: null when the order has no payment record.
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStep'
+          readOnly: true
+          description: Every status the order has been in, oldest first.
+        can_cancel:
+          type: boolean
+          readOnly: true
+          description: 'True while the order is pending: only then may the customer
+            cancel it.'
+      required:
+      - can_cancel
+      - created_at
+      - delivery_charge
+      - history
+      - items
+      - items_count
+      - name
+      - order_id
+      - payment
+      - phone_number
+      - shipping_address
+      - shipping_type
+      - status_display
+      - subtotal
+      - total
+    OrderItem:
+      type: object
+      description: One line, as it was bought (the snapshot), plus the product's current
+        picture and slug for the link.
+      properties:
+        product_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        product_slug:
+          type: string
+          nullable: true
+          readOnly: true
+          description: null when the product has been deleted since.
+        product_name:
+          type: string
+          maxLength: 255
+        variant_label:
+          type: string
+          maxLength: 150
+        sku:
+          type: string
+          maxLength: 100
+        unit_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+          description: What the customer paid for one unit.
+        base_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+          description: The price of one unit before any discount.
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        line_total:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+          description: Absolute URL of the product's main image, or null.
+      required:
+      - base_price
+      - image
+      - line_total
+      - product_id
+      - product_name
+      - product_slug
+      - quantity
+      - sku
+      - unit_price
+      - variant_label
     OrderItemInputRequest:
       type: object
       description: 'A line of the order. The frontend also sends the `price` it shows:
@@ -2773,14 +3135,230 @@ components:
       required:
       - product_id
       - quantity
+    OrderPage:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSummary'
+      required:
+      - count
+      - next
+      - previous
+      - results
+    OrderPayment:
+      type: object
+      description: Documentation of the `payment` block (its source is the payments
+        app, see `orders/hooks.py`).
+      properties:
+        method:
+          type: string
+        method_display:
+          type: string
+        status:
+          type: string
+          description: pending | paid | cancelled | refunded
+        status_display:
+          type: string
+        amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        paid_at:
+          type: string
+          format: date-time
+          nullable: true
+        refunded_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - amount
+      - method
+      - method_display
+      - paid_at
+      - refunded_at
+      - status
+      - status_display
     OrderPlaced:
       type: object
+      description: What `POST /orders/` answers. The frontend reads `order_id`; the
+        rest is what the confirmation page shows.
       properties:
         order_id:
           type: string
           description: The human-readable order number, e.g. GC-20260923-0001 (URL-safe).
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        subtotal:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        delivery_charge:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        total:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
       required:
+      - created_at
+      - delivery_charge
       - order_id
+      - status
+      - subtotal
+      - total
+    OrderStep:
+      type: object
+      description: |-
+        One step of the status history: the status the order moved to, and when. Who moved it and the staff's note are
+        not shown.
+      properties:
+        status:
+          type: string
+        status_display:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - status
+      - status_display
+    OrderSummary:
+      type: object
+      description: A row of the customer's order list.
+      properties:
+        order_id:
+          type: string
+          description: e.g. GC-20260923-0001; use it in /orders/{order_id}/.
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        status_display:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        total:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        items_count:
+          type: integer
+          readOnly: true
+          description: 'Units, not lines: two of one product and one of another is
+            3.'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+          readOnly: true
+      required:
+      - created_at
+      - items
+      - items_count
+      - order_id
+      - status_display
+      - total
+    OrderTracking:
+      type: object
+      description: |-
+        What a guest gets for an order number and its phone number: the progress and what was ordered, nothing about
+        who it is for or where it goes (an order number is easy to guess; the phone number is the only secret).
+      properties:
+        order_id:
+          type: string
+          description: e.g. GC-20260923-0001; use it in /orders/{order_id}/.
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        status_display:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        total:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        items_count:
+          type: integer
+          readOnly: true
+          description: 'Units, not lines: two of one product and one of another is
+            3.'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+          readOnly: true
+        subtotal:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        delivery_charge:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        payment:
+          allOf:
+          - $ref: '#/components/schemas/OrderPayment'
+          nullable: true
+          readOnly: true
+          description: null when the order has no payment record.
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStep'
+          readOnly: true
+          description: Every status the order has been in, oldest first.
+      required:
+      - created_at
+      - delivery_charge
+      - history
+      - items
+      - items_count
+      - order_id
+      - payment
+      - status_display
+      - subtotal
+      - total
     PageContent:
       type: object
       properties:
@@ -3494,12 +4072,44 @@ components:
           type: boolean
           description: A delivered order of theirs contains the product and they have
             not reviewed it yet.
+        review_status:
+          allOf:
+          - $ref: '#/components/schemas/ReviewStatusEnum'
+          description: |-
+            Where the customer stands: `can_review`; `reviewed` (once only); `waiting_for_delivery` (ordered, not delivered yet: see `order_id`); `not_purchased`; `guest` (not signed in).
+
+            * `can_review` - can_review
+            * `reviewed` - reviewed
+            * `waiting_for_delivery` - waiting_for_delivery
+            * `not_purchased` - not_purchased
+            * `guest` - guest
+        order_id:
+          type: string
+          nullable: true
+          description: 'With `waiting_for_delivery`: the number of the order they
+            are waiting for (GET /orders/{order_id}/), else null.'
       required:
       - can_review
       - count
       - next
+      - order_id
       - previous
       - results
+      - review_status
+    ReviewStatusEnum:
+      enum:
+      - can_review
+      - reviewed
+      - waiting_for_delivery
+      - not_purchased
+      - guest
+      type: string
+      description: |-
+        * `can_review` - can_review
+        * `reviewed` - reviewed
+        * `waiting_for_delivery` - waiting_for_delivery
+        * `not_purchased` - not_purchased
+        * `guest` - guest
     ShippingTypeEnum:
       enum:
       - inside_dhaka
@@ -3590,6 +4200,22 @@ components:
       - discount_price
       - name
       - variant_id
+    StatusEnum:
+      enum:
+      - pending
+      - paid
+      - shipped
+      - delivered
+      - cancelled
+      - refunded
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `paid` - Paid
+        * `shipped` - Shipped
+        * `delivered` - Delivered
+        * `cancelled` - Cancelled
+        * `refunded` - Refunded
     Tokens:
       type: object
       properties:

@@ -18,11 +18,14 @@ MULTIPART = "multipart/form-data"
 
 
 class ReviewPagination(EnvelopePageNumberPagination):
-    """The usual `count/next/previous/results`, plus `can_review` for the signed-in customer."""
+    """The usual `count/next/previous/results`, plus where the signed-in customer stands: `can_review`,
+    `review_status` (why not, when not) and `order_id` (the order they are waiting for)."""
 
     def get_paginated_response(self, data):
         response = super().get_paginated_response(data)
         response.data["can_review"] = self.can_review
+        response.data["review_status"] = self.review_status
+        response.data["order_id"] = self.order_id
         return response
 
 
@@ -54,6 +57,17 @@ class ReviewListCreateView(APIView):
                 "can_review": serializers.BooleanField(
                     help_text="A delivered order of theirs contains the product and they have not reviewed it yet."
                 ),
+                "review_status": serializers.ChoiceField(
+                    choices=services.STATUSES,
+                    help_text="Where the customer stands: `can_review`; `reviewed` (once only); "
+                    "`waiting_for_delivery` (ordered, not delivered yet: see `order_id`); `not_purchased`; "
+                    "`guest` (not signed in).",
+                ),
+                "order_id": serializers.CharField(
+                    allow_null=True,
+                    help_text="With `waiting_for_delivery`: the number of the order they are waiting for "
+                    "(GET /orders/{order_id}/), else null.",
+                ),
             },
         ),
     )
@@ -66,7 +80,9 @@ class ReviewListCreateView(APIView):
 
         paginator = ReviewPagination()
         page = paginator.paginate_queryset(services.shown_reviews(product_id), request, view=self)
-        paginator.can_review = services.can_review(request.user, product_id)
+        status, waiting_order = services.review_state(request.user, product_id)
+        paginator.can_review = status == services.CAN_REVIEW
+        paginator.review_status, paginator.order_id = status, waiting_order
         return paginator.get_paginated_response(ReviewSerializer(page, many=True, context={"request": request}).data)
 
     @extend_schema(

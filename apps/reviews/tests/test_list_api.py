@@ -45,8 +45,9 @@ def test_a_guest_sees_the_reviews(api_client, product):
     assert response.status_code == 200, response.content
     body = response.json()
     assert body["success"] is True
-    assert set(body["data"]) == {"count", "next", "previous", "results", "can_review"}
+    assert set(body["data"]) == {"count", "next", "previous", "results", "can_review", "review_status", "order_id"}
     assert body["data"]["count"] == 2 and body["data"]["can_review"] is False
+    assert (body["data"]["review_status"], body["data"]["order_id"]) == ("guest", None)
     first = body["data"]["results"][0]
     assert set(first) == {"id", "product_id", "user_name", "rating", "comment", "created_at", "can_edited", "media_urls"}
     assert first["can_edited"] is False

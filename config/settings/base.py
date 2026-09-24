@@ -159,6 +159,7 @@ REST_FRAMEWORK = {
         "otp_verify": env("THROTTLE_OTP_VERIFY", default="60/hour"),
         "token": env("THROTTLE_TOKEN", default="60/minute"),
         "order": env("THROTTLE_ORDER", default="30/hour"),
+        "order_track": env("THROTTLE_ORDER_TRACK", default="30/hour"),  # a guest looking an order up, per IP; misses count
         "review": env("THROTTLE_REVIEW", default="30/hour"),  # per signed-in customer: writing or editing a review
     },
 }

@@ -246,8 +246,10 @@ All media URLs are absolute.
   "sub_total_price": "1000.00", "delivery_charge": 60, "total_price": "1060.00" }
 ```
 
-`201 → {success: true, message: "Order placed.", data: {order_id}}`; `order_id` is the human-readable, URL-safe order
-number, e.g. `GC-20260923-0001` (the frontend navigates to `/order-confirmation/{order_id}`).
+`201 → {success: true, message: "Order placed.", data: {order_id, status, created_at, subtotal, delivery_charge, total}}`;
+`order_id` is the human-readable, URL-safe order number, e.g. `GC-20260923-0001` (the frontend navigates to
+`/order-confirmation/{order_id}`), and the rest is what that page can show without another call (a guest has no way to
+read the order afterwards except by tracking it, see below).
 
 **Who can order.** Guests (no token) and signed-in customers. A valid Bearer token attaches the order to that account;
 an expired or invalid token is a `401` (the frontend refreshes it), never a silent guest order. A guest order is
@@ -331,16 +333,54 @@ the ORDER and the payment follows. A refund only records that the shop gave the 
 Orders placed before the payments app existed get their payment from a data migration. A gateway later is a new
 `PaymentProvider` in `apps/payments/providers.py`.
 
-**Proposed (needs frontend changes + approval, not part of the frozen contract):** `GET /orders/`,
-`GET /orders/{order_id}/`, `POST /orders/{id}/cancel/`.
+### Reading and cancelling orders (signed in), and tracking (guests)
+
+`{order_id}` is the order number (`GC-20260923-0001`). All of these answer in the usual envelope.
+
+- `GET /orders/` → `data: {count, next, previous, results: [Order summary]}`. The signed-in customer's **own** orders,
+  newest first, paginated like the product lists (`?page=&page_size=`). A guest order belongs to nobody, so it is in no
+  list. Order summary: `{order_id, status, status_display, created_at, total, items_count, items: [Item]}`;
+  `items_count` counts units.
+- `GET /orders/{order_id}/` → `data: Order` = the summary plus `name, email, phone_number, shipping_type, shipping_area,
+  shipping_division, shipping_district, shipping_thana, shipping_address, subtotal, delivery_charge, can_cancel,
+  payment, history`. `payment` is `{method, method_display, status, status_display, amount, paid_at, refunded_at}` or
+  `null` (the payment of section 6, newest one). `history` is every status the order has been in, oldest first:
+  `[{status, status_display, created_at}]` (who moved it and the staff's note are not shown). `can_cancel` is true
+  while the order is `pending`. Somebody else's order, a guest order and an unknown number are the same `404`.
+- `Item = {product_id, product_slug, product_name, variant_label, sku, unit_price, base_price, quantity, line_total,
+  image}`: the snapshot of what was bought and paid; `product_id` and `product_slug` are `null` once the product was
+  deleted, `image` is the product's current main image (absolute URL) or `null`.
+- `POST /orders/{order_id}/cancel/` (no body) → `200`, `data: Order` (now `cancelled`). Only a **pending** order: the
+  goods go back into stock, `total_orders` goes down and the payment is cancelled, all through the same status change
+  as the staff's. Any other status is a `400` (`Only a pending order can be cancelled. To change an order that is
+  already being handled, please contact us.`); somebody else's order is a `404`. Two clicks at once cancel it once.
+  Shares the `order` throttle scope with placing orders.
+- `GET /orders/track/?order_id=GC-…&phone_number=+880…` (**public**, no token needed; a stale token is ignored) →
+  `data: Order summary` + `subtotal, delivery_charge, payment, history`, and **nothing about who the order is for or
+  where it goes** (no name, e-mail, phone or address): an order number is easy to guess, the phone number is the only
+  secret. A wrong number and a wrong phone number are the same `404` (`No order matches these details.`), the number
+  may be typed in any case, missing or malformed input is a `400`. Throttled per client IP (scope `order_track`,
+  `THROTTLE_ORDER_TRACK`, default `30/hour`); wrong guesses count, and past the limit even a right answer waits (`429`).
 
 ## 7. Reviews
 
 - `GET /products/reviews/?product_id=` (public; a valid Bearer token fills in `can_review` and `can_edited`; an
-  expired one is a 401) → `data:{count, next, previous, results:[Review], can_review}`. Newest first, paginated like
-  the product lists (`?page=&page_size=`, 30 per page, at most 120; a page past the end is an empty `results`).
-  `can_review` = the signed-in customer has a **delivered** order containing the product and has not reviewed it yet
-  (always `false` for a guest). A missing or non-numeric `product_id` is a 400, an unknown or hidden product a 404.
+  expired one is a 401) → `data:{count, next, previous, results:[Review], can_review, review_status, order_id}`. Newest
+  first, paginated like the product lists (`?page=&page_size=`, 30 per page, at most 120; a page past the end is an
+  empty `results`). `can_review` = the signed-in customer has a **delivered** order containing the product and has not
+  reviewed it yet (always `false` for a guest). `review_status` says where the customer stands, so the shop can tell
+  them why (same on every page):
+
+  | `review_status` | Meaning | `order_id` |
+  |---|---|---|
+  | `can_review` | a delivered order of theirs contains it, not reviewed yet (`can_review` is true) | `null` |
+  | `reviewed` | they reviewed it (a review the staff hid counts) | `null` |
+  | `waiting_for_delivery` | they ordered it and the order is `pending`, `paid` or `shipped` | the newest such order's number (link to `GET /orders/{order_id}/`) |
+  | `not_purchased` | signed in, no order of theirs on its way or delivered contains it (a cancelled or refunded order counts for nothing; so does somebody else's or a guest order) | `null` |
+  | `guest` | not signed in | `null` |
+
+  A delivered order wins over a newer one that is still on its way; `reviewed` wins over both. A missing or
+  non-numeric `product_id` is a 400, an unknown or hidden product a 404.
 - `POST /products/reviews/` (multipart or JSON: `product_id, rating (1-5, whole), comment, media[]`; signed in) → `201`,
   `data` = the created Review. A `400` when the product is not available, when the customer already reviewed it
   (`You have already reviewed this product. Edit your review instead.`), or when no delivered order of theirs contains
