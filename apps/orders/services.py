@@ -25,16 +25,17 @@ from django.db import transaction
 from django.db.models import Case, F, IntegerField, Value, When
 from django.db.models.functions import Greatest
 from django.utils import timezone
-from rest_framework.exceptions import APIException, ValidationError
+from rest_framework.exceptions import APIException, NotFound, ValidationError
 
 from apps.addresses.models import Address
 from apps.cart.models import CartItem
 from apps.cart.services import active_variants_by_product, choose_variant, describe_variant
 from apps.catalog.models import Product, ProductVariant
 from apps.catalog.pricing import variant_prices
+from apps.catalog.queries import main_images
 from apps.core.money import ZERO, quantize_money
 
-from . import signals, state
+from . import hooks, signals, state
 from .models import DeliveryCharge, Order, OrderItem, OrderSequence, OrderStatusHistory
 
 # What the frontend calls the payment: its form sends "cash", its labels say "cod". Both are cash on delivery.
@@ -248,6 +249,58 @@ def _restock(order):
         _lock_variants(quantities)
         _shift_stock(quantities, +1)
     _shift_total_orders((item.product_id for item in items if item.product_id is not None), -1)
+
+
+# --- what a customer sees of their orders --------------------------------------------------------------------
+CANCEL_REFUSED = (
+    "Only a pending order can be cancelled. To change an order that is already being handled, please contact us."
+)
+
+
+def customer_orders(user):
+    """The signed-in customer's orders, newest first (a queryset, so it paginates)."""
+    return Order.objects.filter(user=user).prefetch_related("items")
+
+
+def customer_order(user, number):
+    """One of the customer's own orders by its number, or a 404. An order of somebody else, a guest order and a
+    number that does not exist all look the same."""
+    order = Order.objects.filter(user=user, number=number).prefetch_related("items", "history").first()
+    if order is None:
+        raise NotFound("Order not found.")
+    return order
+
+
+def tracked_order(number, phone_number):
+    """The order with this number, when `phone_number` is the one it was placed with. For a guest the pair is the key.
+    Every miss is the same 404, so the answer never says which of the two was wrong."""
+    order = Order.objects.filter(number=number, phone_number=phone_number).prefetch_related("items", "history").first()
+    if order is None:
+        raise NotFound("No order matches these details.")
+    return order
+
+
+def order_extras(orders):
+    """What the order serializers need besides the orders themselves, for a whole page in a fixed number of queries:
+    the main image and slug of each ordered product, and each order's payment (from the payments app, if installed)."""
+    orders = list(orders)
+    product_ids = {item.product_id for order in orders for item in order.items.all() if item.product_id}
+    slugs = dict(Product.objects.filter(pk__in=product_ids).values_list("pk", "slug")) if product_ids else {}
+    images = main_images(product_ids) if product_ids else {}
+    return {"images": images, "slugs": slugs, "payments": hooks.payment_info(orders)}
+
+
+def cancel_order(user, number):
+    """The customer cancels their own order. Only while it is pending (once it is paid or shipped a person has to
+    decide); goes through `change_status`, so the goods go back on the shelf and the payment follows."""
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(user=user, number=number).first()  # two clicks: one waits
+        if order is None:
+            raise NotFound("Order not found.")
+        if order.status != Order.Status.PENDING:
+            raise ValidationError(CANCEL_REFUSED)
+        change_status(order, Order.Status.CANCELLED, by=user, note="Cancelled by the customer.")
+    return customer_order(user, number)
 
 
 # --- the checkout page ----------------------------------------------------------------------------------------

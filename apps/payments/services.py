@@ -58,3 +58,23 @@ def handle_order_status_changed(order, new_status):
     if target is None or target == payment.status:
         return payment
     return change_payment_status(payment, target)
+
+
+def payment_info_for_orders(orders):
+    """The provider for `orders.hooks`: `{order.pk: {...}}`, the newest payment of each order, in one query."""
+    info = {}
+    payments = Payment.objects.filter(order_id__in=[order.pk for order in orders]).order_by("-created_at", "-id")
+    for payment in payments:  # newest first, so `setdefault` keeps the newest
+        info.setdefault(
+            payment.order_id,
+            {
+                "method": payment.method,
+                "method_display": payment.get_method_display(),
+                "status": payment.status,
+                "status_display": payment.get_status_display(),
+                "amount": payment.amount,
+                "paid_at": payment.paid_at,
+                "refunded_at": payment.refunded_at,
+            },
+        )
+    return info

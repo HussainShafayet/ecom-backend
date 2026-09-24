@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from apps.accounts.tests.helpers import verified_user
 from apps.cart.models import CartItem
@@ -40,8 +41,19 @@ def test_a_guest_places_an_order(api_client):
     response = place(api_client, line(product, variant, 2))
 
     assert response.status_code == 201
-    assert response.json() == {"success": True, "message": "Order placed.", "data": {"order_id": today_number()}}
+    body = response.json()
+    assert (body["success"], body["message"]) == (True, "Order placed.")
+    # `order_id` is what the frontend reads; the rest is what its confirmation page can show without another call.
+    assert body["data"] == {
+        "order_id": today_number(),
+        "status": "pending",
+        "created_at": body["data"]["created_at"],
+        "subtotal": 1000.0,
+        "delivery_charge": 60.0,
+        "total": 1060.0,
+    }
     order = Order.objects.get()
+    assert parse_datetime(body["data"]["created_at"]) == order.created_at  # the same instant, written in Dhaka time
     assert order.number == today_number()
     assert order.user is None
     assert order.status == Order.Status.PENDING
@@ -344,8 +356,14 @@ def test_both_slash_variants_resolve_without_redirect(api_client):
         assert api_client.post(path, checkout_body(line(product)), format="json").status_code == 201, path
 
 
-def test_only_post_is_allowed(api_client):
-    assert api_client.get(ORDERS).status_code == 405
+def test_a_guest_can_only_post_reading_the_list_needs_a_token(api_client):
+    assert api_client.get(ORDERS).status_code == 401
+
+
+def test_no_other_method_is_allowed_on_the_collection():
+    _, client = signed_in()
+    statuses = [client.put(ORDERS, {}, format="json").status_code, client.patch(ORDERS, {}, format="json").status_code]
+    assert statuses + [client.delete(ORDERS).status_code] == [405, 405, 405]
 
 
 # --- order numbers ------------------------------------------------------------------------------------------

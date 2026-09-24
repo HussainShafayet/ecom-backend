@@ -30,8 +30,12 @@ FRONTEND_CALLS = [
     ("GET", "/content/pages/category"),
     ("GET", "/content/shop"),
     ("GET", "/content/checkout/"),
-    # orders (redux/slice/checkoutSlice.js)
+    # orders (redux/slice/checkoutSlice.js, redux/slice/orderSlice.js)
     ("POST", "/orders/"),
+    ("GET", "/orders/"),
+    ("GET", "/orders/{number}/"),
+    ("POST", "/orders/{number}/cancel/"),
+    ("GET", "/orders/track/"),
     # auth (redux/slice/authSlice.js)
     ("POST", "/accounts/register/"),
     ("POST", "/accounts/verify-otp/"),
@@ -61,7 +65,7 @@ FRONTEND_CALLS = [
     ("PUT", "products/reviews/{id}/"),
 ]
 
-SAMPLE_VALUES = {"id": "1", "slug": "a-product"}
+SAMPLE_VALUES = {"id": "1", "slug": "a-product", "number": "GC-20260101-0001"}
 
 
 def api_path(template, api_root="/api/v1/", **values):

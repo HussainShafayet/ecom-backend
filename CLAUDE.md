@@ -55,6 +55,11 @@ schema together, and never diverge from what the frontend calls without the user
   (lock variants in id order, then products, then the day's order counter). Order status changes only through
   `orders.services.change_status()`, which checks the transition map in `orders/state.py` and always writes
   `OrderStatusHistory`. Prices are always recomputed from the database, never taken from the request.
+- Customers read their orders through `orders.services.customer_orders / customer_order / tracked_order` and cancel only
+  through `orders.services.cancel_order()` (pending only, under the order's row lock, via `change_status`). The order
+  serializers never show the staff's history note or `changed_by`; the guest tracking view (`orders/track/`, public,
+  scope `order_track`) never shows name, e-mail, phone or address. `orders` learns the payment of an order through
+  `orders.hooks` (the payments app registers a provider), never by importing `payments`.
 - Payments: a `Payment` is opened and moved only by `apps/payments` (transition map in `payments/state.py`), driven by
   the `orders.signals` (`order_placed`, `order_status_changed`, sent with `send()` inside the order's transaction so a
   failure rolls both back). `orders` never imports `payments`. `order_placed` receivers run before the order number

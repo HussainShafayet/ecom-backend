@@ -34,7 +34,10 @@ def test_the_list_documents_can_review_and_the_review_shape(schema):
     (param,) = get["parameters"]
     assert (param["name"], param["required"]) == ("product_id", True)
     page = component(schema, get["responses"]["200"]["content"]["application/json"]["schema"]["properties"]["data"]["$ref"])
-    assert set(page["properties"]) == {"count", "next", "previous", "results", "can_review"}
+    assert set(page["properties"]) == {"count", "next", "previous", "results", "can_review", "review_status", "order_id"}
+    assert page["properties"]["order_id"]["nullable"] is True  # only with waiting_for_delivery
+    status = component(schema, page["properties"]["review_status"]["allOf"][0]["$ref"])
+    assert status["enum"] == ["can_review", "reviewed", "waiting_for_delivery", "not_purchased", "guest"]
     review = component(schema, page["properties"]["results"]["items"]["$ref"])
     assert set(review["properties"]) == {
         "id",

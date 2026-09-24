@@ -213,6 +213,14 @@ def main():
             order_ids.append(guest_order.pk)
             ok("the guest order has no customer and the server's prices", guest_order.user is None and guest_order.subtotal > 1 and guest_order.total == guest_order.subtotal + guest_order.delivery_charge, guest_order.total)
 
+            track_query = f"order_id={guest_order.number.lower()}&phone_number=%2B8801712345678"  # typed in lower case
+            status, body, _ = api.call("GET", "/orders/track/", query=track_query)
+            private = ("Smoke Tester", "House 1", "+8801712345678", "Gulshan")
+            ok("GET /orders/track/ as a guest: progress and items, nothing about who or where",
+               status == 200 and body["data"]["status"] == "pending" and body["data"]["items"] and not any(text in json.dumps(body) for text in private), body)
+            status, body, _ = api.call("GET", "/orders/track/", query=f"order_id={guest_order.number}&phone_number=%2B8801799999999")
+            ok("a wrong phone number is a 404 (the same answer as an unknown order)", status == 404 and body["error"] == "No order matches these details.", body)
+
         # ------------------------------------------------------------------------------------------------------
         phase("Sign up: register, OTP, merge of the guest cart and favourites")
         status, body, _ = api.call("POST", "/accounts/register/", body={"phone_number": phone, "email": email, "name": "Smoke Tester"})
@@ -253,7 +261,7 @@ def main():
         status, body, _ = api.call("GET", "/products/search-suggestions/", token=access, query="q=sh")
         ok("search suggestions with a token -> 200", status == 200, body)
         status, body, _ = api.call("GET", "products/reviews/", token=access, query=f"product_id={first['id']}")
-        ok("reviews before the order is delivered: can_review false", status == 200 and body["data"]["can_review"] is False, body)
+        ok("reviews before the order exists: can_review false, not_purchased", status == 200 and body["data"]["can_review"] is False and body["data"]["review_status"] == "not_purchased", body)
         status, body, _ = api.call("GET", "/content/checkout/", token=access)
         ok("checkout content for me: my name and phone", status == 200 and body["data"]["user_info"]["phone_number"] == phone, body)
 
@@ -334,12 +342,48 @@ def main():
         ok("the ordered lines left my cart", status == 200 and cart["data"] == [], cart)
         ok("stock went down and the products counted the sale", all(ProductVariant.objects.get(pk=v["variant"]).stock_quantity < v["stock"] and Product.objects.get(pk=pk).total_orders > v["orders"] for pk, v in saved.items()))
 
+        status, body, _ = api.call("GET", "products/reviews/", token=access, query=f"product_id={first['id']}")
+        ok("ordered but not delivered: waiting_for_delivery, and the order to link to",
+           status == 200 and body["data"]["can_review"] is False and body["data"]["review_status"] == "waiting_for_delivery" and body["data"]["order_id"] == order.number, body)
+
+        phase("My orders: list, detail, cancel")
+        status, body, _ = api.call("GET", "/orders/", token=access)
+        rows = body["data"]["results"] if status == 200 else []
+        ok("GET /orders/ -> only my order (the guest order is nobody's), with its units and lines",
+           status == 200 and [r["order_id"] for r in rows] == [order.number] and rows[0]["items_count"] == 3 and len(rows[0]["items"]) == 2, body)
+        status, body, _ = api.call("GET", "/orders/{number}/", token=access, number=order.number)
+        detail = body.get("data") or {}
+        ok("GET /orders/{number}/ -> address, totals, pending payment, history, can_cancel",
+           status == 200 and detail["shipping_address"] == "House 1, Road 2" and detail["total"] == float(order.total) and detail["payment"]["status"] == "pending"
+           and [h["status"] for h in detail["history"]] == ["pending"] and detail["can_cancel"] is True, body)
+        ok("every line has its name, price, quantity and a picture URL or null", all({"product_name", "unit_price", "quantity", "image", "product_slug"} <= set(i) for i in detail.get("items", [])), detail.get("items"))
+        status, body, _ = api.call("GET", "/orders/{number}/", token=access, number=guest_order.number)
+        ok("a guest order is a 404 for a customer (never leaks)", status == 404, body)
+        stock_before = ProductVariant.objects.get(pk=second["variant_id"]).stock_quantity
+        api.call("POST", "/accounts/cart/", token=access, body=line(second, 1, "increase"))
+        status, body, _ = api.call("POST", "/orders/", token=access, body=checkout_body([(second, 1)], phone=phone))
+        spare = Order.objects.get(number=body["data"]["order_id"])
+        order_ids.append(spare.pk)
+        ok("a second order takes one unit", ProductVariant.objects.get(pk=second["variant_id"]).stock_quantity == stock_before - 1)
+        status, body, _ = api.call("POST", "/orders/{number}/cancel/", token=access, number=spare.number)
+        ok("POST /orders/{number}/cancel/ -> cancelled, and the unit is back on the shelf",
+           status == 200 and body["data"]["status"] == "cancelled" and body["data"]["payment"]["status"] == "cancelled"
+           and ProductVariant.objects.get(pk=second["variant_id"]).stock_quantity == stock_before, body)
+        status, body, _ = api.call("POST", "/orders/{number}/cancel/", token=access, number=spare.number)
+        ok("cancelling again -> 400", status == 400 and "pending" in body["error"], body)
+
         phase("Delivery (staff) and a review with a photo and a video")
         order_services.change_status(order, Order.Status.SHIPPED)
         order_services.change_status(order, Order.Status.DELIVERED)
         ok("delivered: the cash was collected (payment paid)", list(order.payments.values_list("status", flat=True)) == ["paid"])
+        status, body, _ = api.call("GET", "/orders/{number}/", token=access, number=order.number)
+        ok("the order now reads delivered and paid, history pending -> shipped -> delivered, no longer cancellable",
+           status == 200 and body["data"]["status"] == "delivered" and body["data"]["payment"]["status"] == "paid" and body["data"]["can_cancel"] is False
+           and [h["status"] for h in body["data"]["history"]] == ["pending", "shipped", "delivered"], body)
+        status, body, _ = api.call("POST", "/orders/{number}/cancel/", token=access, number=order.number)
+        ok("a delivered order can not be cancelled -> 400", status == 400, body)
         status, body, _ = api.call("GET", "products/reviews/", token=access, query=f"product_id={first['id']}")
-        ok("can_review is true after delivery", status == 200 and body["data"]["can_review"] is True, body)
+        ok("can_review is true after delivery", status == 200 and body["data"]["can_review"] is True and body["data"]["review_status"] == "can_review" and body["data"]["order_id"] is None, body)
         status, body, _ = api.call("POST", "products/reviews/", token=access, fields=[("product_id", first["id"]), ("rating", 4), ("comment", "Good product.")],
                                    files=[("media", "photo.png", "image/png", png()), ("media", "clip.mp4", "video/mp4", MP4)])
         review = body.get("data") or {}
@@ -349,6 +393,8 @@ def main():
             ok("the review photo is served, and media_urls[].type is a MIME type", status == 200 and review["media_urls"][0]["type"] == "image/png" and review["media_urls"][1]["type"] == "video/mp4", review["media_urls"])
         status, body, _ = api.call("POST", "products/reviews/", token=access, fields=[("product_id", first["id"]), ("rating", 1), ("comment", "again")])
         ok("a second review of the same product -> 400", status == 400, body)
+        status, body, _ = api.call("GET", "products/reviews/", token=access, query=f"product_id={first['id']}")
+        ok("after reviewing: review_status is reviewed", status == 200 and body["data"]["review_status"] == "reviewed", body)
         status, body, _ = api.call("POST", "products/reviews/", token=access, fields=[("product_id", second["id"]), ("rating", 5), ("comment", "Nice")])
         ok("... and one of a product of the same order works (it was delivered too)", status == 201, body)
         status, body, _ = api.call("PUT", "products/reviews/{id}/", token=access, id=review.get("id", 0),

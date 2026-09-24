@@ -147,6 +147,11 @@ stock). **Delivery charges** are two rows, Inside Dhaka (60.00) and Outside Dhak
 migration; edit the amount there (placed orders keep the amount they were charged). Order numbers look like
 `GC-20260923-0001` (`ORDER_NUMBER_PREFIX`); `THROTTLE_ORDER` limits how often one client can place orders.
 
+Customers see their own orders (`GET /orders/`, `GET /orders/{order_id}/`) and may cancel one while it is **pending**
+(`POST /orders/{order_id}/cancel/`: the goods go back into stock, the payment is cancelled). A guest, who has no
+account, follows an order with its number and phone number (`GET /orders/track/`, `THROTTLE_ORDER_TRACK`): progress
+and contents only, never the name or address. What staff write in the status note is never shown to the customer.
+
 Every order also has a **payment** (cash on delivery: pending when placed, paid when the order is delivered or marked
 paid, cancelled or refunded when the order is). Staff see them, read-only, under **Payments**; move the order and the
 payment follows.
