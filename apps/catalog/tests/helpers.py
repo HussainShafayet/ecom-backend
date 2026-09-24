@@ -4,7 +4,7 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from PIL import Image
 
-from apps.catalog.models import Brand, Category, Color, Product, ProductVariant, Size
+from apps.catalog.models import Brand, Category, Color, Product, ProductMedia, ProductVariant, Size, Tag
 
 MP4 = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + b"\x00" * 64
 
@@ -42,3 +42,13 @@ def make_size(name="M", sort_order=2):
 
 def make_brand(name="Acme"):
     return Brand.objects.create(name=name)
+
+
+def make_tag(name="new"):
+    return Tag.objects.create(name=name)
+
+
+def make_media(product, color=None, order=0, video=False):
+    """A gallery image (or a video) of the product; an image gets its WebP thumbnail automatically."""
+    file = ContentFile(MP4, name="clip.mp4") if video else image_file()
+    return ProductMedia.objects.create(product=product, color=color, file=file, order=order)
