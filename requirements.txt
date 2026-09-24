@@ -6,3 +6,5 @@ django-environ==0.14.0
 django-cors-headers==4.9.0
 psycopg[binary]==3.3.6
 Pillow==12.3.0
+nh3==0.3.7
+qrcode[pil]==8.2
