@@ -2590,6 +2590,9 @@ components:
           type: integer
           readOnly: true
           nullable: true
+        minimum_order_quantity:
+          type: integer
+          readOnly: true
         is_favourite:
           type: boolean
           readOnly: true
@@ -2623,6 +2626,7 @@ components:
       - id
       - image
       - is_favourite
+      - minimum_order_quantity
       - name
       - quantity
       - size_name
@@ -3592,6 +3596,9 @@ components:
           type: integer
           readOnly: true
           nullable: true
+        minimum_order_quantity:
+          type: integer
+          readOnly: true
         is_favourite:
           type: boolean
           readOnly: true
@@ -3624,9 +3631,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MediaFile'
-          readOnly: true
-        minimum_order_quantity:
-          type: integer
           readOnly: true
         short_description:
           type: string
@@ -3802,6 +3806,9 @@ components:
           type: integer
           readOnly: true
           nullable: true
+        minimum_order_quantity:
+          type: integer
+          readOnly: true
         is_favourite:
           type: boolean
           readOnly: true
@@ -3818,6 +3825,7 @@ components:
       - id
       - image
       - is_favourite
+      - minimum_order_quantity
       - name
       - sku
       - slug

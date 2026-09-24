@@ -22,7 +22,7 @@ LIST = "/api/v1/products/"
 ITEM_KEYS = {
     "id", "name", "slug", "sku", "image", "base_price", "discount_price", "has_discount", "discount_type",
     "discount_value", "brand_name", "total_views", "total_orders", "total_reviews", "avg_rating",
-    "availability_status", "has_variants", "variant_id", "is_favourite",
+    "availability_status", "has_variants", "variant_id", "minimum_order_quantity", "is_favourite",
 }  # fmt: skip
 
 
@@ -484,3 +484,19 @@ def test_curated_lists_stay_flat(api_client):
     for index in range(8):
         sellable(make_product(f"B{index}", is_featured=True))
     assert count_queries(api_client, "/api/v1/products/featured/") == small == 2
+
+
+def test_a_card_says_the_smallest_quantity_the_shop_takes(api_client):
+    """The cart and the product cards can only warn about a minimum order if the card carries it (the order itself is
+    refused below it, see orders). It is the PRODUCT's minimum, whatever the variant."""
+    from apps.catalog.tests.helpers import make_product, make_variant
+
+    plain = make_product("Mug")
+    make_variant(plain, stock_quantity=5)
+    knives = make_product("Knife Set", minimum_order_quantity=2)
+    make_variant(knives, stock_quantity=5)
+
+    cards = {item["name"]: item for item in get(api_client).json()["data"]["results"]}
+
+    assert cards["Mug"]["minimum_order_quantity"] == 1
+    assert cards["Knife Set"]["minimum_order_quantity"] == 2

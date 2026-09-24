@@ -160,8 +160,10 @@ search`. `ordering` ∈ `price, -price, discount_price, -discount_price, rating,
 
 **Product list item:** `id, name, slug, sku, image, base_price, discount_price, has_discount, discount_type
 ("percentage"|"fixed"), discount_value, brand_name, total_views, total_orders, total_reviews, avg_rating (number),
-availability_status (bool), has_variants (bool), variant_id, is_favourite`.
-`discount_price` is always a number (equals `base_price` when there is no discount).
+availability_status (bool), has_variants (bool), variant_id, minimum_order_quantity, is_favourite`.
+`discount_price` is always a number (equals `base_price` when there is no discount). `minimum_order_quantity` is the
+product's smallest order (1 unless the shop set more): an order below it is refused (section 6), so a cart line (which
+is a card too) can warn early.
 
 **`GET /products/detail/{slug}/`** = list item plus: `brand{name}, categories[{name,slug}], category (primary slug),
 tags[{name}], thumbnail, media_files[{file_type:"image"|"video", file_url, thumbnail_url}], minimum_order_quantity,
