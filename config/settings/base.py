@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.accounts",
     "apps.addresses",
+    "apps.catalog",
 ]
 
 MIDDLEWARE = [
@@ -88,6 +89,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 MAX_IMAGE_UPLOAD_MB = env.int("MAX_IMAGE_UPLOAD_MB", default=5)
+MAX_VIDEO_UPLOAD_MB = env.int("MAX_VIDEO_UPLOAD_MB", default=50)
 
 # The frontend calls both `/products` and `/products/` (and `/accounts/cart/`, ...). A 301 redirect would
 # break CORS preflights that carry an Authorization header, so URLs are registered in both forms instead

@@ -1,6 +1,7 @@
 import re
 import uuid
 
+from django.db import transaction
 from django.utils.deconstruct import deconstructible
 
 
@@ -19,3 +20,9 @@ class RandomUploadTo:
         match = re.search(r"\.([A-Za-z0-9]{1,5})$", filename or "")
         extension = f".{match.group(1).lower()}" if match else ""
         return f"{self.prefix}/{uuid.uuid4().hex}{extension}"
+
+
+def delete_file_on_commit(storage, name):
+    """Delete a stored file once the surrounding transaction has committed (so a rollback keeps it)."""
+    if name:
+        transaction.on_commit(lambda: storage.delete(name))
