@@ -61,8 +61,11 @@ schema together, and never diverge from what the frontend calls without the user
 - A DRF view with `authentication_classes = []` must define `get_authenticate_header()`, otherwise DRF turns every 401
   into a 403 (see `PublicAuthView`). Public auth views ignore the Authorization header on purpose: the frontend sends
   its stale access token to refresh/logout.
-- OTP delivery is pluggable via `OTP_BACKEND` (`apps/accounts/otp/backends.py`). Only `ConsoleOTPBackend` may print
-  a code, and prod has no default backend.
+- OTP delivery is pluggable via `OTP_BACKEND` (`apps/accounts/otp/backends.py`). Only `ConsoleOTPBackend` and
+  `BrowserOTPBackend` may print a code, and prod has no default backend. `BrowserOTPBackend` is DEBUG only: it also
+  shows the code in the `message` of the register / login / resend-otp / request-otp responses (through
+  `IssuedOTP.dev_code`, never stored), raises `ImproperlyConfigured` when `DEBUG` is off, and `config.settings.prod`
+  refuses to start with it. No other backend may put a code in a response.
 - Both `/x` and `/x/` must resolve with no redirect: register routes with `apps.core.urls.dual_path`. `APPEND_SLASH=False`.
 - Views stay thin, logic lives in `services.py`; serializers validate; permissions per view. The default permission is
   `IsAuthenticated`, so public endpoints must say `permission_classes = [AllowAny]`.

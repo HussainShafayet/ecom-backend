@@ -23,7 +23,7 @@ ACCOUNT_DISABLED = "This account is disabled."
 
 
 def register_user(*, name, phone_number, email=None):
-    """Create (or re-use, if never verified) the user and send a register OTP. Returns (user, token)."""
+    """Create (or re-use, if never verified) the user and send a register OTP. Returns (user, IssuedOTP)."""
     email = email.strip().lower() if email else None
     try:
         with transaction.atomic():
@@ -41,16 +41,16 @@ def register_user(*, name, phone_number, email=None):
                 user.name, user.email = name, email
                 user.save(update_fields=["name", "email", "updated_at"])
 
-            token = otp_service.start_otp(
+            issued = otp_service.start_otp(
                 user=user, purpose=OTPRequest.Purpose.REGISTER, target=phone_number
             )
     except IntegrityError as exc:  # two simultaneous sign-ups for the same number
         raise ValidationError({"phone_number": [PHONE_EXISTS]}) from exc
-    return user, token
+    return user, issued
 
 
 def start_login(*, phone_number):
-    """Send a login OTP to an existing, verified user. Returns (user, token)."""
+    """Send a login OTP to an existing, verified user. Returns (user, IssuedOTP)."""
     user = User.objects.filter(phone_number=phone_number).first()
     if user is None:
         raise ValidationError(
@@ -62,8 +62,8 @@ def start_login(*, phone_number):
         raise ValidationError(
             {"phone_number": ["This number has not been verified yet. Please sign up again to verify it."]}
         )
-    token = otp_service.start_otp(user=user, purpose=OTPRequest.Purpose.LOGIN, target=phone_number)
-    return user, token
+    issued = otp_service.start_otp(user=user, purpose=OTPRequest.Purpose.LOGIN, target=phone_number)
+    return user, issued
 
 
 def resend_auth_otp(*, token):

@@ -71,6 +71,27 @@ resent every 60 s. To plug in a real SMS/email provider, write a class with
 
 Staff (Django admin) are the only users with passwords: `python manage.py createsuperuser`.
 
+### See the OTP in the browser (development)
+
+Switching to the `runserver` terminal for every code gets old. With the development-only `BrowserOTPBackend` the code
+is also appended to the `message` the frontend already displays after sign up, sign in, "resend" and the profile
+"send OTP" (nothing to change in the frontend):
+
+```
+OTP sent to +88017****5678. [DEV] Your code is 402885.
+```
+
+Turn it on by setting this line in `.env` (keep `DEBUG=True`) and restarting `runserver`; remove it (or point it back
+at `ConsoleOTPBackend`) to go back to printing in the terminal:
+
+```
+OTP_BACKEND=apps.accounts.otp.backends.BrowserOTPBackend
+```
+
+It still logs the code like the console backend. Guards: it refuses to work unless `DEBUG` is `True` (OTP requests
+then answer `503`, the reason is in the server log), `config.settings.prod` refuses to start with it, and the default
+stays `ConsoleOTPBackend`. Use it on your own machine only: anyone who can reach the API can read the codes.
+
 ### Uploaded files (profile pictures)
 
 In dev they are stored in `backend/media/` (gitignored) and served by `runserver` at `/media/...`; the API returns
@@ -104,7 +125,8 @@ python manage.py seed_catalog && python manage.py seed_content               # d
 ## Production notes
 
 - `DJANGO_SETTINGS_MODULE=config.settings.prod`, `DEBUG` off, real `SECRET_KEY`, `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`.
-- **`OTP_BACKEND` has no default in prod**: startup fails until you point it at a real delivery class.
+- **`OTP_BACKEND` has no default in prod**: startup fails until you point it at a real delivery class
+  (`BrowserOTPBackend`, which shows codes in API responses, is rejected).
 - Rate-limit counters live in a database cache shared by all workers. Create its table once:
   `python manage.py createcachetable`
 - Blacklisted refresh tokens pile up. Purge expired ones regularly (cron, e.g. daily):

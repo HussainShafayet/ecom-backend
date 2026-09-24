@@ -99,7 +99,7 @@ def test_unknown_token(api_client):
 
 def test_a_profile_otp_cannot_be_used_to_sign_in(api_client, otp_outbox):
     user = verified_user()
-    token = start_otp(user=user, purpose=OTPRequest.Purpose.PROFILE_PHONE, target="+8801799999999")
+    token = start_otp(user=user, purpose=OTPRequest.Purpose.PROFILE_PHONE, target="+8801799999999").token
     response = sign_in(api_client, token, otp_outbox[-1].code)
     assert response.status_code == 400
     assert OTPRequest.objects.get().consumed_at is None

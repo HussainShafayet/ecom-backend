@@ -1,4 +1,6 @@
 """Production settings. Every value that differs per deployment comes from the environment."""
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F401,F403
 from .base import env
 
@@ -24,6 +26,13 @@ X_FRAME_OPTIONS = "DENY"
 # No default on purpose: a deployment without a real OTP delivery class must fail loudly at startup
 # instead of silently printing codes to the log.
 OTP_BACKEND = env("OTP_BACKEND")
+# BrowserOTPBackend puts the code in the API response. It also refuses to run without DEBUG; this makes a
+# deployment that names it (under any module path) fail at startup instead of answering OTP requests with 503.
+if OTP_BACKEND.strip().rsplit(".", 1)[-1] == "BrowserOTPBackend":
+    raise ImproperlyConfigured(
+        "OTP_BACKEND=BrowserOTPBackend is for local development only (it shows OTP codes in API responses) "
+        "and is not allowed in production. Point OTP_BACKEND at a real SMS/email delivery class."
+    )
 
 # Throttle counters shared between worker processes (create the table once: manage.py createcachetable).
 CACHES = {

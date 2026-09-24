@@ -61,6 +61,13 @@ e.g. `Invalid OTP. 4 attempts left.`, `This OTP has expired. Please request a ne
 `Too many incorrect attempts. Please request a new OTP.` Throttled requests are `429` with `Retry-After`.
 A delivery failure is `503` (nothing is created). In dev the code is printed in the server log.
 
+**Dev only, never production:** with `OTP_BACKEND=apps.accounts.otp.backends.BrowserOTPBackend` the `message` of
+`register/`, `login/`, `resend-otp/` and `request-otp/` also carries the code, e.g.
+`OTP sent to +88017****5678. [DEV] Your code is 123456.` (or `A new OTP has been sent. [DEV] Your code is 123456.`),
+so the frontend shows it without any change. `data` and every other message stay as documented. That backend refuses to
+work unless `DEBUG=True` (the request then fails with `503`) and the prod settings refuse to start with it: a production
+response never contains a code. Clients must not parse or rely on this text.
+
 ## 3. Profile & addresses (auth required)  *(live)*
 
 | Endpoint | Request | `data` |
