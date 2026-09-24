@@ -4,7 +4,8 @@ Canonical contract between the React frontend (`../ecom`) and this backend. It m
 sends and reads today. **Anything that would require a frontend change is marked "proposed" and needs the
 user's approval first.**
 
-Implementation status is tracked in the plan; sections marked *(live)* are implemented (health, auth, profile, addresses so far).
+Implementation status is tracked in the plan; sections marked *(live)* are implemented (health, auth, profile,
+addresses, cart, wishlist, catalog, content, orders so far).
 
 - **Base URL:** `{API_ROOT}/` = `http://localhost:8000/api/v1/`. The frontend's `VITE_BASE_URL` must **end with `/`**.
 - **Slashes:** every route answers both with and without a trailing slash, with no redirect. The slash form is canonical.
@@ -142,7 +143,7 @@ cleared. `title` is optional. At most 20 addresses per user (`MAX_ADDRESSES_PER_
   (an out-of-stock variant is skipped), the line and favourite limits are respected, and only the first 200 / 500
   entries are read.
 
-## 5. Catalog & content (public; a Bearer token is optional and only personalises `is_favourite`)  *(live: `/products/…`, `/content/shop`, `/content/pages/*`; `/content/checkout` is still to come)*
+## 5. Catalog & content (public; a Bearer token is optional: it personalises `is_favourite` and `/content/checkout`)  *(live)*
 
 `GET /products/` query: `page, page_size, ordering, category (slug, includes child categories), brands, tags, colors,
 sizes (comma separated names), min_price, max_price (effective price), discount_type + discount_value (exact match),
@@ -212,11 +213,19 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
   left banner and one active right banner. Slider and left banner take an image, the video slider a video, the
   right banner either. `external_link` is always `http(s)://`.
 - `/products/categories…` list every active category A-Z (flat, with images), the flagged variants only the flagged ones.
+- **`/content/checkout/`** (public; the Bearer token is optional, an expired one is a 401 like everywhere else):
+  - `delivery_charges` are what an order will be charged, as JSON **numbers** (the frontend calls `.toFixed(2)` on
+    them): `inside_dhaka` 60 and `outside_dhaka` 120 by default, edited by staff in the admin (Orders > Delivery
+    charges). A shipping type without a configured charge is left out of the object (an order with it is a 400).
+    The frontend treats a charge of `0` as "not set" and blocks the form, so free delivery needs a frontend change.
+  - `shipping_addresses` is the signed-in customer's saved addresses (section 3), oldest first; `[]` for a guest.
+  - `user_info` is `{name, phone_number, email}` of the signed-in customer (`phone_number` is always a string,
+    `email` is `""` when there is none), `null` for a guest. The frontend uses it to pre-fill the form.
 
 CMS item (slider/banner): `{order, type:"product"|"category"|"external", link, external_link, media, media_type:"image"|"video", caption}`.
 All media URLs are absolute.
 
-## 6. Orders
+## 6. Orders  *(live)*
 
 `POST /orders/` (guest or authenticated):
 
@@ -229,14 +238,71 @@ All media URLs are absolute.
   "sub_total_price": "1000.00", "delivery_charge": 60, "total_price": "1060.00" }
 ```
 
-`201 → data: {order_id}` (human-readable, URL-safe, e.g. `GC-20260923-0001`).
+`201 → {success: true, message: "Order placed.", data: {order_id}}`; `order_id` is the human-readable, URL-safe order
+number, e.g. `GC-20260923-0001` (the frontend navigates to `/order-confirmation/{order_id}`).
 
-- Prices and totals sent by the client are **ignored**; the server recomputes them from the database and the
-  configured delivery charge. A mismatch is not an error.
-- `inside_dhaka` needs `shipping_area`; `outside_dhaka` needs `shipping_division`, `shipping_district`, `shipping_thana`.
-- 400 for an empty cart, an inactive/out-of-stock item, `quantity` below `minimum_order_quantity`, or an invalid shipping combination.
-- For an authenticated user the ordered lines are removed from the server cart.
-- Statuses: `pending, paid, shipped, delivered, cancelled, refunded`.
+**Who can order.** Guests (no token) and signed-in customers. A valid Bearer token attaches the order to that account;
+an expired or invalid token is a `401` (the frontend refreshes it), never a silent guest order. A guest order is
+never linked to an account afterwards, not even to one with the same phone number. Ordering is rate limited (scope
+`order`, `THROTTLE_ORDER`, default `30/hour`): per client IP for guests, per account for signed-in customers, failed
+attempts count too; over the limit is `429` with `Retry-After`.
+
+**Body rules.** `name` ≤ 150 chars, required. `email` optional (`""` and `null` are fine). `phone_number` is `+880` and 10
+digits. `shipping_type` is `inside_dhaka` (needs `shipping_area`) or `outside_dhaka` (needs `shipping_division`,
+`shipping_district`, `shipping_thana`); fields that do not apply are cleared, like in a saved address (section 3).
+`shipping_address` required, ≤ 500. `payment_type` is `cash` or `cod` (both = cash on delivery; default `cash`).
+`items` has 1 to `MAX_CART_LINES` (50) entries `{product_id, variant_id?, quantity}` with `quantity` 1 to 10000; a
+missing or `null` `variant_id` means the product's only active variant (several variants and none named is an error).
+Any other key (`price`, `sub_total_price`, `delivery_charge`, `total_price`, `shipping`, …) is ignored.
+
+**The server prices everything.** Prices and totals sent by the client are ignored; a mismatch is not an error.
+Each line costs the variant's final price (the variant's own price when it overrides the product's, else the product's
+discount rule, see section 5); `subtotal` is the sum of the lines, `delivery_charge` comes from the configured charge of
+the shipping type (default 60 inside Dhaka, 120 outside), `total = subtotal + delivery_charge`. Everything is stored as
+a snapshot (contact, address, product name, variant label, SKU, unit and base price, delivery charge), so later
+edits to the catalog, the charges or the profile never change a placed order.
+
+**Errors.** A `400` for: an empty or too long `items` list, a bad field, an unknown, hidden or variant-less product, a
+variant that is not the product's or is inactive, several variants and none chosen, out of stock, more than the stock,
+`quantity` below the product's `minimum_order_quantity`, or a shipping type with no configured delivery charge. All
+the problems of an order are reported **together**, one plain sentence each, and nothing is written:
+
+```jsonc
+{ "success": false, "message": "Validation failed.", "error": "Mug is out of stock.",
+  "errors": ["Mug is out of stock.", "Only 3 of Cap left in stock.", "The minimum order for Pen is 4.",
+             "Delivery is not available for this shipping type right now."] }
+```
+
+Field problems (bad phone, missing area, …) come first, on their own, with `field_errors`; the stock, minimum and
+availability checks only run once the request itself is well formed. The same variant listed twice is added up first,
+and the minimum order quantity is checked per (merged) variant line. A hidden product is reported by id, never by name.
+The checks and the stock are read under a row lock, so two customers racing for the last unit get one `201` and one
+`400` ("… is out of stock."), never an oversell.
+
+**What a successful order does.** Status `pending` (one `OrderStatusHistory` row), the ordered quantities leave the
+stock, each distinct product's `total_orders` ("N orders" on the shop) goes up by one (per order, not per unit), and
+for a signed-in customer the ordered variants leave their server cart (the other lines stay).
+
+**Order number.** `<prefix>-YYYYMMDD-NNNN`: `ORDER_NUMBER_PREFIX` (default `GC`), the date in the shop's time zone
+(Asia/Dhaka), and a counter that restarts at `0001` every day (zero padded to 4 digits, it simply grows longer after
+9999). A failed order does not use up a number.
+
+**Statuses:** `pending, paid, shipped, delivered, cancelled, refunded`. Only staff change them (Django admin: the
+status field and the bulk actions "Mark as paid / shipped / delivered", "Cancel and restock"); every change writes
+an `OrderStatusHistory` row. The allowed moves are defined once, in `apps/orders/state.py`:
+
+| from | may become |
+|---|---|
+| `pending` | `paid`, `shipped`, `cancelled` |
+| `paid` | `shipped`, `cancelled`, `refunded` |
+| `shipped` | `delivered`, `cancelled` |
+| `delivered` | `refunded` |
+| `cancelled`, `refunded` | nothing (final) |
+
+The goods go back into stock (and `total_orders` of each distinct product goes down by one, never below 0) when an
+order is **cancelled** (from `pending`, `paid` or `shipped`) or a **`paid` order is refunded**. A **`delivered` order
+that is refunded is not restocked**: the goods already left, and whether they come back sellable is for a person to
+decide (edit the stock in the admin). Cancelling twice is impossible, so goods are never returned twice.
 
 **Proposed (needs frontend changes + approval, not part of the frozen contract):** `GET /orders/`,
 `GET /orders/{order_id}/`, `POST /orders/{id}/cancel/`.
