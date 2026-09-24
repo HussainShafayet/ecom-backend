@@ -4203,17 +4203,21 @@ components:
     StatusEnum:
       enum:
       - pending
+      - confirmed
       - paid
       - shipped
       - delivered
+      - returned
       - cancelled
       - refunded
       type: string
       description: |-
         * `pending` - Pending
+        * `confirmed` - Confirmed
         * `paid` - Paid
         * `shipped` - Shipped
         * `delivered` - Delivered
+        * `returned` - Returned
         * `cancelled` - Cancelled
         * `refunded` - Refunded
     Tokens:

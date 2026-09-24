@@ -3,10 +3,12 @@ from django.db import migrations
 # order status -> (payment status, was cash collected)
 BY_ORDER_STATUS = {
     "pending": ("pending", False),
+    "confirmed": ("pending", False),  # (no order has these two when this runs; a test insists every status is here)
     "shipped": ("pending", False),
     "paid": ("paid", True),
     "delivered": ("paid", True),
     "cancelled": ("cancelled", False),
+    "returned": ("cancelled", False),
     "refunded": ("refunded", True),  # a refund only follows a paid or delivered order
 }
 

@@ -297,22 +297,32 @@ for a signed-in customer the ordered variants leave their server cart (the other
 (Asia/Dhaka), and a counter that restarts at `0001` every day (zero padded to 4 digits, it simply grows longer after
 9999). A failed order does not use up a number.
 
-**Statuses:** `pending, paid, shipped, delivered, cancelled, refunded`. Only staff change them (Django admin: the
-status field and the bulk actions "Mark as paid / shipped / delivered", "Cancel and restock"); every change writes
-an `OrderStatusHistory` row. The allowed moves are defined once, in `apps/orders/state.py`:
+**Statuses:** `pending, confirmed, paid, shipped, delivered, returned, cancelled, refunded` (the frontend was built on
+the six without `confirmed` and `returned`; nothing was renamed). Only staff change them (Django admin: the status
+field and the bulk actions "Mark as confirmed / paid / shipped / delivered / returned", "Cancel and restock"); every
+change writes an `OrderStatusHistory` row. The allowed moves are defined once, in `apps/orders/state.py`:
 
 | from | may become |
 |---|---|
-| `pending` | `paid`, `shipped`, `cancelled` |
+| `pending` | `confirmed`, `paid`, `shipped`, `cancelled` |
+| `confirmed` | `paid`, `shipped`, `cancelled` |
 | `paid` | `shipped`, `cancelled`, `refunded` |
-| `shipped` | `delivered`, `cancelled` |
+| `shipped` | `delivered`, `returned`, `cancelled` |
 | `delivered` | `refunded` |
-| `cancelled`, `refunded` | nothing (final) |
+| `cancelled`, `returned`, `refunded` | nothing (final) |
+
+`confirmed` (staff checked the order, e.g. by phone) and `paid` are **optional** steps: a cash-on-delivery order
+normally goes `pending -> shipped -> delivered` (the cash is collected at the door, so the payment turns paid then), a
+shop that phones its customers adds `confirmed`, a prepaid order goes through `paid`. `delivered` and `returned` are
+only reachable from `shipped`. `returned` = the shipped parcel came back (delivery failed, or the customer refused
+it).
 
 The goods go back into stock (and `total_orders` of each distinct product goes down by one, never below 0) when an
-order is **cancelled** (from `pending`, `paid` or `shipped`) or a **`paid` order is refunded**. A **`delivered` order
-that is refunded is not restocked**: the goods already left, and whether they come back sellable is for a person to
-decide (edit the stock in the admin). Cancelling twice is impossible, so goods are never returned twice.
+order is **cancelled** (from `pending`, `confirmed`, `paid` or `shipped`), when a shipped parcel is **returned**, or
+when a **`paid` order is refunded**. A **`delivered` order that is refunded is not restocked**: the goods already
+left, and whether they come back sellable is for a person to decide (edit the stock in the admin; returned goods that
+are damaged are corrected the same way). Every one of these statuses is final or moves on only once, so goods are
+never returned twice. A customer can still cancel only a **pending** order (once staff confirm it, a person decides).
 
 **Payments** (no endpoint: the frontend offers cash on delivery only, so nothing is exposed to it). Every order gets one
 `Payment` row in the same transaction that places it (`pending`, amount = the order total, method `cod`), and the
@@ -321,9 +331,11 @@ side rolls both back.
 
 | The order becomes | A `pending` payment becomes | A `paid` payment becomes |
 |---|---|---|
+| `confirmed` | (unchanged) | (unchanged) |
 | `paid` (staff marked it) | `paid` | (unchanged) |
 | `shipped` | (unchanged: nothing is collected yet) | (unchanged) |
 | `delivered` (the courier collected the cash) | `paid` | (unchanged) |
+| `returned` (the parcel came back) | `cancelled` | `refunded` |
 | `cancelled` | `cancelled` | `refunded` |
 | `refunded` | `cancelled` | `refunded` |
 

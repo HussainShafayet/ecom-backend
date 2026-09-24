@@ -116,10 +116,12 @@ def test_the_page_shows_everything_but_only_the_status_can_be_edited(admin_clien
 @pytest.mark.parametrize(
     "status, expected",
     [
-        ("pending", ["pending", "paid", "shipped", "cancelled"]),
+        ("pending", ["pending", "confirmed", "paid", "shipped", "cancelled"]),
+        ("confirmed", ["confirmed", "paid", "shipped", "cancelled"]),
         ("paid", ["paid", "shipped", "cancelled", "refunded"]),
-        ("shipped", ["shipped", "delivered", "cancelled"]),
+        ("shipped", ["shipped", "delivered", "returned", "cancelled"]),
         ("delivered", ["delivered", "refunded"]),
+        ("returned", ["returned"]),
         ("cancelled", ["cancelled"]),
         ("refunded", ["refunded"]),
     ],
@@ -210,14 +212,18 @@ def test_the_items_and_the_history_are_read_only_inlines(admin_client, order):
 # --- the actions ----------------------------------------------------------------------------------------------
 def test_the_actions_are_offered(admin_client, order):
     html = admin_client.get(reverse(f"admin:{LIST_URL}")).content.decode()
-    for label in ("Mark as paid", "Mark as shipped", "Mark as delivered", "Cancel and restock"):
+    labels = ("Mark as confirmed", "Mark as paid", "Mark as shipped", "Mark as delivered", "Mark as returned", "Cancel and restock")
+    for label in labels:
         assert label in html
 
 
 @pytest.mark.parametrize(
     "action, start, expected, message",
     [
+        ("mark_confirmed", "pending", "confirmed", "1 order(s) marked as confirmed."),
         ("mark_paid", "pending", "paid", "1 order(s) marked as paid."),
+        ("mark_paid", "confirmed", "paid", "1 order(s) marked as paid."),
+        ("mark_returned", "shipped", "returned", "1 order(s) marked as returned and put back in stock."),
         ("mark_shipped", "paid", "shipped", "1 order(s) marked as shipped."),
         ("mark_delivered", "shipped", "delivered", "1 order(s) marked as delivered."),
         ("cancel_and_restock", "paid", "cancelled", "1 order(s) cancelled and put back in stock."),
@@ -233,6 +239,18 @@ def test_each_action_moves_the_orders_through_the_service(admin_client, staff, o
     assert order.status == expected
     row = order.history.last()
     assert (row.from_status, row.to_status, row.changed_by) == (start, expected, staff)
+
+
+def test_mark_as_returned_gives_the_goods_back_and_only_works_on_a_shipped_parcel(admin_client, order):
+    services.change_status(order, Status.SHIPPED)
+    assert stock_of(order.variant) == 8
+    run_action(admin_client, "mark_returned", order)
+    assert stock_of(order.variant) == 10 and orders_of(order.mug) == 0
+
+    other, _ = stocked("Other")
+    pending = make_order(line(other))
+    response = run_action(admin_client, "mark_returned", pending)
+    assert f"{pending.number}: A pending order can not become returned." in messages_of(response)
 
 
 def test_cancel_and_restock_gives_the_goods_back(admin_client, order):

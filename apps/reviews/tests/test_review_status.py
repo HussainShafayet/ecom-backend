@@ -36,7 +36,7 @@ def test_a_signed_in_customer_who_never_ordered_it_has_not_purchased_it():
     assert status_of(client, product) == (NOT_PURCHASED, None, False)
 
 
-@pytest.mark.parametrize("path", [[], ["paid"], ["shipped"], ["paid", "shipped"]])
+@pytest.mark.parametrize("path", [[], ["confirmed"], ["paid"], ["shipped"], ["confirmed", "shipped"], ["paid", "shipped"]])
 def test_an_order_that_is_on_its_way_is_waiting_for_delivery_and_says_which_order(path):
     product, variant = stocked()
     user, client = signed_in()
@@ -74,8 +74,8 @@ def test_a_delivered_order_wins_over_a_newer_one_still_on_its_way():
     assert status_of(client, product) == (CAN_REVIEW, None, True)
 
 
-@pytest.mark.parametrize("path", [["cancelled"], ["shipped", "cancelled"]])
-def test_a_cancelled_order_counts_for_nothing(path):
+@pytest.mark.parametrize("path", [["cancelled"], ["shipped", "cancelled"], ["confirmed", "cancelled"], ["shipped", "returned"]])
+def test_a_cancelled_or_returned_order_counts_for_nothing(path):
     product, variant = stocked()
     user, client = signed_in()
     order = make_order(line(product, variant), user=user)

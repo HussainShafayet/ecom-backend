@@ -372,6 +372,24 @@ def main():
         status, body, _ = api.call("POST", "/orders/{number}/cancel/", token=access, number=spare.number)
         ok("cancelling again -> 400", status == 400 and "pending" in body["error"], body)
 
+        # a cash-on-delivery order the courier could not deliver: confirmed (phone call) -> shipped -> returned
+        status, body, _ = api.call("POST", "/orders/", token=access, body=checkout_body([(second, 1)], phone=phone))
+        failed = Order.objects.get(number=body["data"]["order_id"])
+        order_ids.append(failed.pk)
+        order_services.change_status(failed, Order.Status.CONFIRMED)
+        status, body, _ = api.call("GET", "/orders/{number}/", token=access, number=failed.number)
+        ok("a confirmed order reads Confirmed and the customer can no longer cancel it",
+           status == 200 and body["data"]["status_display"] == "Confirmed" and body["data"]["can_cancel"] is False, body)
+        status, body, _ = api.call("POST", "/orders/{number}/cancel/", token=access, number=failed.number)
+        ok("cancelling a confirmed order -> 400 (a person decides)", status == 400, body)
+        order_services.change_status(failed, Order.Status.SHIPPED)
+        order_services.change_status(failed, Order.Status.RETURNED)
+        status, body, _ = api.call("GET", "/orders/{number}/", token=access, number=failed.number)
+        ok("a returned parcel: status Returned, payment cancelled, history pending -> confirmed -> shipped -> returned, goods back",
+           status == 200 and body["data"]["status"] == "returned" and body["data"]["payment"]["status"] == "cancelled"
+           and [h["status"] for h in body["data"]["history"]] == ["pending", "confirmed", "shipped", "returned"]
+           and ProductVariant.objects.get(pk=second["variant_id"]).stock_quantity == stock_before, body)
+
         phase("Delivery (staff) and a review with a photo and a video")
         order_services.change_status(order, Order.Status.SHIPPED)
         order_services.change_status(order, Order.Status.DELIVERED)
