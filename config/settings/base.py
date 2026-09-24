@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.addresses",
     "apps.catalog",
+    "apps.content",
 ]
 
 MIDDLEWARE = [
@@ -163,6 +164,8 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/v1",
     "COMPONENT_SPLIT_REQUEST": True,  # separate request/response components (needed for file uploads)
+    # Product media and content items both say image|video: one schema name for that choice set.
+    "ENUM_NAME_OVERRIDES": {"MediaTypeEnum": "apps.content.models.MediaType"},
     "PREPROCESSING_HOOKS": ["apps.core.schema.exclude_slashless_aliases"],
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",

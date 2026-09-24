@@ -98,6 +98,7 @@ pytest apps/core -q                                              # one app
 python manage.py makemigrations && python manage.py migrate
 python manage.py spectacular --file openapi.yaml --validate --fail-on-warn   # regenerate + validate schema
 python manage.py check --deploy --settings=config.settings.prod              # production readiness (needs prod env vars)
+python manage.py seed_catalog && python manage.py seed_content               # demo products, sliders and banners (dev only)
 ```
 
 ## Production notes
@@ -116,11 +117,13 @@ config/            settings/{base,dev,prod}.py, urls.py, api_urls.py (everything
 apps/core/         response envelope, error handling, pagination, money helpers, URL helper, health check
 apps/accounts/     custom phone User, OTP register/login, JWT refresh/logout, profile (+ OTP-verified phone/email change, picture)
 apps/addresses/    saved shipping addresses (shop-specific, not part of the template base)
+apps/catalog/      categories, brands, products, variants, media; the public product/category API and /content/shop
+apps/content/      editable sliders and banners of the six shop pages (/content/pages/<page>/)
 docs/API_CONTRACT.md   canonical API contract (what the frontend calls)
 openapi.yaml       generated schema (keep in sync: see command above)
 ```
 
-More apps (`catalog`, `cart`, `orders`, `payments`, `reviews`, `content`) are added step by step.
+More apps (`cart`, `orders`, `payments`, `reviews`) are added step by step.
 
 ## Settings
 
