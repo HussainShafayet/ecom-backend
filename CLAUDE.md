@@ -29,12 +29,13 @@ django-cors-headers. Celery and Redis are NOT set up; ask before adding them.
 ```bash
 python manage.py runserver | migrate | makemigrations | createsuperuser
 pytest                                   # every step must end green
-python manage.py spectacular --file openapi.yaml --validate --fail-on-warn
+python manage.py spectacular --file openapi.yaml --validate --fail-on-warn   # commit the result: a test compares it
+python scripts/e2e_smoke.py              # a whole customer visit against the RUNNING dev server (dev DB only)
 ```
 
 ## Structure
 
-`config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) ·
+`config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` · `scripts/` ·
 `apps/{core,accounts,addresses,catalog,content,wishlist,cart,orders,payments,reviews}` (built step by step) ·
 `docs/API_CONTRACT.md` · `openapi.yaml`
 
@@ -75,6 +76,9 @@ schema together, and never diverge from what the frontend calls without the user
   product with `save_without_counters()` so it never writes back stale ones.
 - `.env.example` lists every variable `config/settings/*.py` reads (a test checks), values without inline comments
   (django-environ would keep the comment as part of the value).
+- The frontend's calls are listed in `config/frontend_calls.py` (spelled as `ecom/src` writes them). A change to the API
+  means: that list, `docs/API_CONTRACT.md`, `openapi.yaml` (regenerate, commit), and `scripts/e2e_smoke.py` if the flow
+  changes; `config/tests` and the smoke fail until they agree.
 - Status codes matter to the frontend: bad OTP/validation/out-of-stock = 400; 401 ONLY for missing/expired/invalid
   tokens (a 401 makes the frontend try to refresh, then log the user out).
 - `apps/accounts` (and `core`) must not import shop apps (catalog/cart/orders...): this base is reused for other

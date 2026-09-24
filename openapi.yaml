@@ -247,6 +247,324 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/cart/:
+    get:
+      operationId: accounts_cart_list
+      description: The signed-in customer's cart. The default permission (IsAuthenticated)
+        applies.
+      summary: 'My cart: a plain array, one entry per line (`id` is the product id)'
+      tags:
+      - cart
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CartItem'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: accounts_cart_create
+      description: The signed-in customer's cart. The default permission (IsAuthenticated)
+        applies.
+      summary: Add to or take from a line. `quantity` is a delta; taking it to 0 removes
+        the line
+      tags:
+      - cart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartAddRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CartAddRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CartAddRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Done.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    nullable: true
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: accounts_cart_update
+      description: Without `variant_id`, every line of that product is removed. What
+        is not in the cart is ignored.
+      summary: 'Remove lines: one `{product_id, variant_id?}` or an array of them'
+      tags:
+      - cart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CartRefRequest'
+          multipart/form-data:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CartRefRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CartRefRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    nullable: true
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/accounts/favourite/:
+    get:
+      operationId: accounts_favourite_list
+      description: The signed-in customer's saved products. The default permission
+        (IsAuthenticated) applies.
+      summary: 'My favourites: a plain array of product cards, newest first'
+      tags:
+      - wishlist
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: accounts_favourite_create
+      description: The signed-in customer's saved products. The default permission
+        (IsAuthenticated) applies.
+      summary: Save a product (saving it twice is fine)
+      tags:
+      - wishlist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRefRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductRefRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductRefRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    nullable: true
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: accounts_favourite_update
+      description: The signed-in customer's saved products. The default permission
+        (IsAuthenticated) applies.
+      summary: Remove products from my favourites (one `{product_id}` or an array
+        of them)
+      tags:
+      - wishlist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProductRefRequest'
+          multipart/form-data:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProductRefRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProductRefRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    nullable: true
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/accounts/login/:
     post:
       operationId: accounts_login_create
@@ -774,6 +1092,147 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/content/checkout/:
+    get:
+      operationId: content_checkout_retrieve
+      description: 'Public (Bearer optional): what the checkout page needs before
+        the customer fills in the form.'
+      summary: Delivery charges, and for a signed-in customer their saved addresses
+        and details
+      tags:
+      - content
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/CheckoutContent'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/content/pages/{page}/:
+    get:
+      operationId: content_pages_retrieve
+      description: Public. A page nobody has filled in yet answers with empty lists
+        and null banners (200), never an error.
+      summary: The sliders and banners of one page
+      parameters:
+      - in: path
+        name: page
+        schema:
+          type: string
+          enum:
+          - best_selling
+          - category
+          - feature
+          - flashsale
+          - home
+          - newarrival
+        required: true
+      tags:
+      - content
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PagePayload'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/content/shop/:
+    get:
+      operationId: content_shop_retrieve
+      summary: Everything the shop sidebar can filter by
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/ShopContent'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/health/:
     get:
       operationId: health_retrieve
@@ -813,8 +1272,960 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/orders/:
+    post:
+      operationId: orders_create
+      description: 'Prices and totals in the body are ignored: the server prices every
+        line from the catalog and adds the configured delivery charge. Every problem
+        (unknown or hidden product, stock, minimum order quantity, ...) comes back
+        together as a 400 with `errors: [sentence, ...]`, and nothing is written.
+        A signed-in customer''s ordered lines leave their server cart.'
+      summary: Place an order (guest or signed in)
+      tags:
+      - orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceOrderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PlaceOrderRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PlaceOrderRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OrderPlaced'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/:
+    get:
+      operationId: products_list
+      summary: 'List products: filters, sorting, pagination'
+      parameters:
+      - in: query
+        name: brands
+        schema:
+          type: string
+        description: Comma separated brand names.
+      - in: query
+        name: category
+        schema:
+          type: string
+        description: Category slug. Includes the categories below it.
+      - in: query
+        name: colors
+        schema:
+          type: string
+        description: Comma separated colour names.
+      - in: query
+        name: discount_type
+        schema:
+          enum:
+          - percentage
+          - fixed
+          - ''
+          type: string
+        description: |-
+          * `percentage` - Percentage
+          * `fixed` - Fixed amount
+      - in: query
+        name: discount_value
+        schema:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+      - in: query
+        name: max_price
+        schema:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        description: Highest price the customer pays.
+      - in: query
+        name: min_price
+        schema:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        description: Lowest price the customer pays.
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - price
+          - -price
+          - discount_price
+          - -discount_price
+          - rating
+          - -rating
+          - ''
+          type: string
+        description: |-
+          Empty = newest first. `price` sorts before the discount, `discount_price` by what the customer pays.
+
+          * `price` - price
+          * `-price` - -price
+          * `discount_price` - discount_price
+          * `-discount_price` - -discount_price
+          * `rating` - rating
+          * `-rating` - -rating
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+          maxLength: 100
+        description: Words that must all appear in the name, SKU, model, brand or
+          a tag.
+      - in: query
+        name: sizes
+        schema:
+          type: string
+        description: Comma separated size names.
+      - in: query
+        name: tags
+        schema:
+          type: string
+        description: Comma separated tag names.
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedProductListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/best-selling/:
+    get:
+      operationId: products_best_selling_list
+      description: Products the admin marked with `flag`, newest first unless `ordering`
+        says otherwise.
+      summary: Best selling products (most orders first)
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedProductListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/categories/:
+    get:
+      operationId: products_categories_list
+      summary: All active categories
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedCategoryListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/categories/best-selling/:
+    get:
+      operationId: products_categories_best_selling_list
+      summary: Best selling categories
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedCategoryListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/categories/feature/:
+    get:
+      operationId: products_categories_feature_list
+      summary: Featured categories
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedCategoryListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/categories/flash-sale/:
+    get:
+      operationId: products_categories_flash_sale_list
+      summary: Flash sale categories
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedCategoryListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/categories/new-arrival/:
+    get:
+      operationId: products_categories_new_arrival_list
+      summary: New arrival categories
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedCategoryListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/detail/{slug}/:
+    get:
+      operationId: products_detail_retrieve
+      summary: One product with its colours, sizes and media (counts a view)
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/ProductDetail'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/featured/:
+    get:
+      operationId: products_featured_list
+      description: Products the admin marked with `flag`, newest first unless `ordering`
+        says otherwise.
+      summary: Featured products
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedProductListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/flash-sale/:
+    get:
+      operationId: products_flash_sale_list
+      description: Products the admin marked with `flag`, newest first unless `ordering`
+        says otherwise.
+      summary: Flash sale products
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedProductListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/new-arrivals/:
+    get:
+      operationId: products_new_arrivals_list
+      description: Products the admin marked with `flag`, newest first unless `ordering`
+        says otherwise.
+      summary: New arrival products
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/PaginatedProductListList'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/reviews/:
+    get:
+      operationId: products_reviews_retrieve
+      summary: Reviews of a product, newest first, and whether the signed-in customer
+        may write one
+      parameters:
+      - in: query
+        name: product_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reviews
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/ReviewPage'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: products_reviews_create
+      description: Needs a delivered order of the customer that contains the product;
+        one review per product. Up to `MAX_REVIEW_FILES` (5) photos or videos in repeated
+        `media` parts.
+      summary: Write a review of a product you received (multipart)
+      tags:
+      - reviews
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WriteReviewRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/Review'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/reviews/{id}/:
+    put:
+      operationId: products_reviews_update
+      description: Every field is optional. Files are ADDED to the review's media
+        (5 in all); text values under `media` (the frontend re-sends the existing
+        ones as `[object Object]`) are ignored. Someone else's review, or a hidden
+        one, is a 404.
+      summary: 'Edit your review: rating, comment, and more media (multipart)'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reviews
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EditReviewRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/Review'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/search-suggestions/:
+    get:
+      operationId: products_search_suggestions_retrieve
+      summary: Product name suggestions for the search box
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: What the customer typed so far.
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: array
+                    items:
+                      type: string
+                    maxItems: 10
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
+    ActionEnum:
+      enum:
+      - increase
+      - decrease
+      type: string
+      description: |-
+        * `increase` - increase
+        * `decrease` - decrease
     Address:
       type: object
       properties:
@@ -875,6 +2286,388 @@ components:
     BlankEnum:
       enum:
       - ''
+    CartAddRequest:
+      type: object
+      properties:
+        product_id:
+          type: integer
+          minimum: 1
+        quantity:
+          type: integer
+          maximum: 10000
+          minimum: 1
+          default: 1
+          description: A delta, not the new total.
+        variant_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: May be left out when the product has exactly one variant.
+        action:
+          allOf:
+          - $ref: '#/components/schemas/ActionEnum'
+          default: increase
+      required:
+      - product_id
+    CartItem:
+      type: object
+      description: |-
+        A product card plus the cart line. `id` is the PRODUCT id. Price, image, `variant_id` and availability are
+        those of the chosen variant: `cart_items()` prepares one product copy per line that way.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        slug:
+          type: string
+          readOnly: true
+          description: Leave empty to generate it from the name.
+          pattern: ^[-a-zA-Z0-9_]+$
+        sku:
+          type: string
+          readOnly: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        base_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        discount_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          description: What the customer pays; equals base_price without a discount.
+        has_discount:
+          type: boolean
+          readOnly: true
+        discount_type:
+          type: string
+          nullable: true
+          readOnly: true
+        discount_value:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        brand_name:
+          type: string
+          nullable: true
+          readOnly: true
+        total_views:
+          type: integer
+          readOnly: true
+        total_orders:
+          type: integer
+          readOnly: true
+        total_reviews:
+          type: integer
+          readOnly: true
+        avg_rating:
+          type: number
+          format: double
+          maximum: 10
+          minimum: -10
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        availability_status:
+          type: boolean
+          readOnly: true
+        has_variants:
+          type: boolean
+          readOnly: true
+          description: True when the customer has to pick a colour or size.
+        variant_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        is_favourite:
+          type: boolean
+          readOnly: true
+        quantity:
+          type: integer
+          readOnly: true
+        color_name:
+          type: string
+          nullable: true
+          readOnly: true
+        color_hex_code:
+          type: string
+          nullable: true
+          readOnly: true
+        size_name:
+          type: string
+          nullable: true
+          readOnly: true
+      required:
+      - availability_status
+      - avg_rating
+      - base_price
+      - brand_name
+      - color_hex_code
+      - color_name
+      - discount_price
+      - discount_type
+      - discount_value
+      - has_discount
+      - has_variants
+      - id
+      - image
+      - is_favourite
+      - name
+      - quantity
+      - size_name
+      - sku
+      - slug
+      - total_orders
+      - total_reviews
+      - total_views
+      - variant_id
+    CartRefRequest:
+      type: object
+      properties:
+        product_id:
+          type: integer
+          minimum: 1
+        variant_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Left out = every line of that product.
+      required:
+      - product_id
+    CategoryList:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        slug:
+          type: string
+          readOnly: true
+          description: Leave empty to generate it from the name.
+          pattern: ^[-a-zA-Z0-9_]+$
+        image:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        has_discount:
+          type: boolean
+          readOnly: true
+        discount_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        discount_type:
+          type: string
+          nullable: true
+          readOnly: true
+      required:
+      - discount_amount
+      - discount_type
+      - has_discount
+      - id
+      - image
+      - name
+      - slug
+    CategoryRef:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+          pattern: ^[-a-zA-Z0-9_]+$
+      required:
+      - name
+      - slug
+    CheckoutContent:
+      type: object
+      properties:
+        delivery_charges:
+          allOf:
+          - $ref: '#/components/schemas/DeliveryCharges'
+          description: A shipping type without a configured charge is left out (ordering
+            with it is a 400).
+        shipping_addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+          description: The customer's saved addresses; [] for a guest.
+        user_info:
+          allOf:
+          - $ref: '#/components/schemas/UserInfo'
+          nullable: true
+          description: null for a guest.
+      required:
+      - delivery_charges
+      - shipping_addresses
+      - user_info
+    ColorOption:
+      type: object
+      properties:
+        name:
+          type: string
+        hex_code:
+          type: string
+        media_files:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaFile'
+          description: The colour's own media, else the shared product media.
+        sizes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SizeOption'
+        variant_id:
+          type: integer
+        base_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        discount_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        availability_status:
+          type: boolean
+      required:
+      - hex_code
+      - media_files
+      - name
+      - sizes
+    ContentItem:
+      type: object
+      properties:
+        order:
+          type: integer
+          description: 1, 2, 3... within its list (unique, so it can be a React key).
+        type:
+          $ref: '#/components/schemas/TypeEnum'
+        link:
+          type: string
+          nullable: true
+          description: Slug of the product or category; null for another website.
+        external_link:
+          type: string
+          nullable: true
+          description: Only for type `external`.
+        media:
+          type: string
+          format: uri
+        media_type:
+          $ref: '#/components/schemas/MediaTypeEnum'
+        caption:
+          type: string
+      required:
+      - caption
+      - external_link
+      - link
+      - media
+      - media_type
+      - order
+      - type
+    DeliveryCharges:
+      type: object
+      properties:
+        inside_dhaka:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        outside_dhaka:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+    Dimension:
+      type: object
+      properties:
+        width:
+          type: number
+          format: double
+          maximum: 1000000
+          minimum: -1000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+        height:
+          type: number
+          format: double
+          maximum: 1000000
+          minimum: -1000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+        depth:
+          type: number
+          format: double
+          maximum: 1000000
+          minimum: -1000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+      required:
+      - depth
+      - height
+      - width
+    EditReviewRequest:
+      type: object
+      description: 'The multipart body of PUT: every field is optional, and `product_id`
+        may only repeat the review''s own.'
+      properties:
+        product_id:
+          type: integer
+          minimum: 1
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        comment:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        media:
+          type: array
+          items:
+            type: string
+            format: binary
+          description: Photos (JPEG, PNG, WebP) and videos (MP4, WebM).
     FieldEnum:
       enum:
       - phone_number
@@ -920,6 +2713,38 @@ components:
           type: string
         refresh:
           type: string
+    MediaFile:
+      type: object
+      properties:
+        file_type:
+          $ref: '#/components/schemas/MediaTypeEnum'
+        file_url:
+          type: string
+          format: uri
+        thumbnail_url:
+          type: string
+          format: uri
+          nullable: true
+          description: A video has one only when a poster was uploaded.
+      required:
+      - file_type
+      - file_url
+      - thumbnail_url
+    MediaTypeEnum:
+      enum:
+      - image
+      - video
+      type: string
+      description: |-
+        * `image` - Image
+        * `video` - Video
+    Name:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+      - name
     OTPSent:
       type: object
       properties:
@@ -928,6 +2753,508 @@ components:
           description: Opaque URL-safe token; send it back with the OTP.
       required:
       - token
+    OrderItemInputRequest:
+      type: object
+      description: 'A line of the order. The frontend also sends the `price` it shows:
+        it is ignored, the server prices the line.'
+      properties:
+        product_id:
+          type: integer
+          minimum: 1
+        variant_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: May be left out when the product has exactly one variant.
+        quantity:
+          type: integer
+          maximum: 10000
+          minimum: 1
+      required:
+      - product_id
+      - quantity
+    OrderPlaced:
+      type: object
+      properties:
+        order_id:
+          type: string
+          description: The human-readable order number, e.g. GC-20260923-0001 (URL-safe).
+      required:
+      - order_id
+    PageContent:
+      type: object
+      properties:
+        image_sliders:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentItem'
+        video_sliders:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentItem'
+        left_banner:
+          allOf:
+          - $ref: '#/components/schemas/ContentItem'
+          nullable: true
+        right_banner:
+          allOf:
+          - $ref: '#/components/schemas/ContentItem'
+          nullable: true
+      required:
+      - image_sliders
+      - left_banner
+      - right_banner
+      - video_sliders
+    PagePayload:
+      type: object
+      properties:
+        page_content:
+          $ref: '#/components/schemas/PageContent'
+      required:
+      - page_content
+    PaginatedCategoryListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryList'
+    PaginatedProductListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductList'
+    PaymentTypeEnum:
+      enum:
+      - cash
+      - cod
+      type: string
+      description: |-
+        * `cash` - Cash on delivery
+        * `cod` - Cash on delivery
+    PlaceOrderRequest:
+      type: object
+      description: |-
+        The body of `POST /orders/`. Keys that are not listed (`price`, `sub_total_price`, `delivery_charge`,
+        `total_price`, `shipping`, ...) are ignored: prices and totals always come from the database.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        email:
+          nullable: true
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        phone_number:
+          type: string
+          minLength: 1
+          pattern: ^\+880\d{10}$
+          maxLength: 14
+        shipping_type:
+          $ref: '#/components/schemas/ShippingTypeEnum'
+        shipping_area:
+          type: string
+          maxLength: 100
+        shipping_division:
+          type: string
+          maxLength: 100
+        shipping_district:
+          type: string
+          maxLength: 100
+        shipping_thana:
+          type: string
+          maxLength: 100
+        shipping_address:
+          type: string
+          minLength: 1
+          maxLength: 500
+        payment_type:
+          allOf:
+          - $ref: '#/components/schemas/PaymentTypeEnum'
+          default: cash
+          description: |-
+            "cash" and "cod" both mean cash on delivery.
+
+            * `cash` - Cash on delivery
+            * `cod` - Cash on delivery
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemInputRequest'
+      required:
+      - items
+      - name
+      - phone_number
+      - shipping_address
+      - shipping_type
+    ProductDetail:
+      type: object
+      description: The card plus everything the detail page shows. `colors` / `sizes`
+        are left out when they do not apply.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        slug:
+          type: string
+          readOnly: true
+          description: Leave empty to generate it from the name.
+          pattern: ^[-a-zA-Z0-9_]+$
+        sku:
+          type: string
+          readOnly: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        base_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        discount_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          description: What the customer pays; equals base_price without a discount.
+        has_discount:
+          type: boolean
+          readOnly: true
+        discount_type:
+          type: string
+          nullable: true
+          readOnly: true
+        discount_value:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        brand_name:
+          type: string
+          nullable: true
+          readOnly: true
+        total_views:
+          type: integer
+          readOnly: true
+        total_orders:
+          type: integer
+          readOnly: true
+        total_reviews:
+          type: integer
+          readOnly: true
+        avg_rating:
+          type: number
+          format: double
+          maximum: 10
+          minimum: -10
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        availability_status:
+          type: boolean
+          readOnly: true
+        has_variants:
+          type: boolean
+          readOnly: true
+          description: True when the customer has to pick a colour or size.
+        variant_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        is_favourite:
+          type: boolean
+          readOnly: true
+        brand:
+          allOf:
+          - $ref: '#/components/schemas/Name'
+          nullable: true
+          readOnly: true
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryRef'
+          readOnly: true
+        category:
+          type: string
+          nullable: true
+          description: Slug of the primary category.
+          readOnly: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Name'
+          readOnly: true
+        thumbnail:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        media_files:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaFile'
+          readOnly: true
+        minimum_order_quantity:
+          type: integer
+          readOnly: true
+        short_description:
+          type: string
+          readOnly: true
+          description: Rich text. HTML is cleaned when saved.
+        long_description:
+          type: string
+          readOnly: true
+          description: Rich text. HTML is cleaned when saved.
+        model:
+          type: string
+          readOnly: true
+        weight:
+          type: string
+          readOnly: true
+          description: Shown as typed, e.g. "500 g".
+        dimension:
+          allOf:
+          - $ref: '#/components/schemas/Dimension'
+          nullable: true
+          readOnly: true
+        material:
+          type: string
+          readOnly: true
+        features:
+          type: string
+          readOnly: true
+        warranty_information:
+          type: string
+          readOnly: true
+        shipping_information:
+          type: string
+          readOnly: true
+        return_policy:
+          type: string
+          readOnly: true
+        qrcode_image_url:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        colors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColorOption'
+        sizes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SizeOption'
+      required:
+      - availability_status
+      - avg_rating
+      - base_price
+      - brand
+      - brand_name
+      - categories
+      - category
+      - dimension
+      - discount_price
+      - discount_type
+      - discount_value
+      - features
+      - has_discount
+      - has_variants
+      - id
+      - image
+      - is_favourite
+      - long_description
+      - material
+      - media_files
+      - minimum_order_quantity
+      - model
+      - name
+      - qrcode_image_url
+      - return_policy
+      - shipping_information
+      - short_description
+      - sku
+      - slug
+      - tags
+      - thumbnail
+      - total_orders
+      - total_reviews
+      - total_views
+      - variant_id
+      - warranty_information
+      - weight
+    ProductList:
+      type: object
+      description: One product card. Prices are those of the default variant (what
+        the card adds to the cart).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        slug:
+          type: string
+          readOnly: true
+          description: Leave empty to generate it from the name.
+          pattern: ^[-a-zA-Z0-9_]+$
+        sku:
+          type: string
+          readOnly: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+        base_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        discount_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          description: What the customer pays; equals base_price without a discount.
+        has_discount:
+          type: boolean
+          readOnly: true
+        discount_type:
+          type: string
+          nullable: true
+          readOnly: true
+        discount_value:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        brand_name:
+          type: string
+          nullable: true
+          readOnly: true
+        total_views:
+          type: integer
+          readOnly: true
+        total_orders:
+          type: integer
+          readOnly: true
+        total_reviews:
+          type: integer
+          readOnly: true
+        avg_rating:
+          type: number
+          format: double
+          maximum: 10
+          minimum: -10
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        availability_status:
+          type: boolean
+          readOnly: true
+        has_variants:
+          type: boolean
+          readOnly: true
+          description: True when the customer has to pick a colour or size.
+        variant_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        is_favourite:
+          type: boolean
+          readOnly: true
+      required:
+      - availability_status
+      - avg_rating
+      - base_price
+      - brand_name
+      - discount_price
+      - discount_type
+      - discount_value
+      - has_discount
+      - has_variants
+      - id
+      - image
+      - is_favourite
+      - name
+      - sku
+      - slug
+      - total_orders
+      - total_reviews
+      - total_views
+      - variant_id
+    ProductRefRequest:
+      type: object
+      properties:
+        product_id:
+          type: integer
+          minimum: 1
+      required:
+      - product_id
     Profile:
       type: object
       description: What GET/PUT /accounts/profile/ return (exactly the keys the frontend
@@ -1090,6 +3417,89 @@ components:
           maxLength: 200
       required:
       - token
+    Review:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product_id:
+          type: integer
+          readOnly: true
+        user_name:
+          type: string
+          readOnly: true
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        comment:
+          type: string
+          maxLength: 2000
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        can_edited:
+          type: boolean
+          readOnly: true
+          description: True for the signed-in author of this review.
+        media_urls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewMedia'
+          readOnly: true
+      required:
+      - can_edited
+      - comment
+      - created_at
+      - id
+      - media_urls
+      - product_id
+      - rating
+      - user_name
+    ReviewMedia:
+      type: object
+      description: '`{file, type}`: the absolute URL, and the MIME type (a `<source
+        type=...>` needs one, not just "video").'
+      properties:
+        file:
+          type: string
+          format: uri
+          readOnly: true
+        type:
+          type: string
+          readOnly: true
+      required:
+      - file
+      - type
+    ReviewPage:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
+        can_review:
+          type: boolean
+          description: A delivered order of theirs contains the product and they have
+            not reviewed it yet.
+      required:
+      - can_review
+      - count
+      - next
+      - previous
+      - results
     ShippingTypeEnum:
       enum:
       - inside_dhaka
@@ -1098,6 +3508,52 @@ components:
       description: |-
         * `inside_dhaka` - Inside Dhaka
         * `outside_dhaka` - Outside Dhaka
+    ShopContent:
+      type: object
+      description: 'Only for the schema: the payload is built in `shop_content.shop_content`.'
+      properties:
+        categories:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: '[{name, slug, children: [same shape]}]'
+        brands:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        colors:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: '[{name, hex_code}]'
+        sizes:
+          type: array
+          items:
+            type: string
+        price_range:
+          type: object
+          additionalProperties: {}
+          description: '{min_range, max_range}: what customers pay, lowest and highest.'
+        discounts:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: '[{discount_type, value}]'
+      required:
+      - brands
+      - categories
+      - colors
+      - discounts
+      - price_range
+      - sizes
+      - tags
     SignIn:
       type: object
       properties:
@@ -1105,6 +3561,35 @@ components:
           $ref: '#/components/schemas/Tokens'
       required:
       - tokens
+    SizeOption:
+      type: object
+      properties:
+        name:
+          type: string
+        variant_id:
+          type: integer
+        base_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        discount_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        availability_status:
+          type: boolean
+      required:
+      - availability_status
+      - base_price
+      - discount_price
+      - name
+      - variant_id
     Tokens:
       type: object
       properties:
@@ -1115,6 +3600,30 @@ components:
       required:
       - access
       - refresh
+    TypeEnum:
+      enum:
+      - product
+      - category
+      - external
+      type: string
+      description: |-
+        * `product` - A product
+        * `category` - A category
+        * `external` - Another website
+    UserInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        phone_number:
+          type: string
+        email:
+          type: string
+          description: '"" when the customer has none.'
+      required:
+      - email
+      - name
+      - phone_number
     VerifyOTPRequest:
       type: object
       properties:
@@ -1141,6 +3650,31 @@ components:
       required:
       - otp
       - token
+    WriteReviewRequest:
+      type: object
+      description: The multipart body of POST.
+      properties:
+        product_id:
+          type: integer
+          minimum: 1
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        comment:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        media:
+          type: array
+          items:
+            type: string
+            format: binary
+          description: Photos (JPEG, PNG, WebP) and videos (MP4, WebM).
+      required:
+      - comment
+      - product_id
+      - rating
     ErrorEnvelope:
       type: object
       required:
