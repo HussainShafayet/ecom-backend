@@ -1,23 +1,14 @@
 """Read-only shapes the React shop expects (see docs/API_CONTRACT.md section 5). The querysets come from
 `queries.with_list_fields`, which supplies the annotated values these serializers read."""
-from django.core.files.storage import default_storage
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+
+from apps.core.utils import absolute_url  # noqa: F401  (also imported from here by other apps)
 
 from . import pricing
 from .models import Category, Product, ProductMedia
 
 MONEY = {"max_digits": 12, "decimal_places": 2}
-
-
-def absolute_url(request, file):
-    """Absolute URL of a stored file (a FieldFile or a bare storage name), or None when there is none.
-    The frontend lives on another origin, so a media URL is never relative."""
-    name = getattr(file, "name", file)
-    if not name:
-        return None
-    url = default_storage.url(name)
-    return request.build_absolute_uri(url) if request is not None else url
 
 
 class OptionalMethodField(serializers.SerializerMethodField):

@@ -420,3 +420,47 @@ Orders placed before the payments app existed get their payment from a data migr
 
 - `GET /health/` → `data: {status:"ok", database:"ok"}`; `503` with the error envelope if PostgreSQL is unreachable. *(live)*
 - `GET /api/schema/` (OpenAPI 3) and `GET /api/docs/` (Swagger UI) are served at the site root, outside `/api/v1/`, when `ENABLE_API_DOCS=True`.
+
+## 9. The shop's identity, pages, FAQ, contact form and newsletter (public)  *(live)*
+
+Everything the storefront shows that is not a product, written by the admin in Django admin under **Site**. All of it is
+public and needs no token (a stale `Authorization` header is ignored, never a 401). Nothing here is shop-specific: the
+app (`apps/siteconfig`) never imports the catalog, so a template base can take it along. The frontend reads it in
+`services/siteService.js`.
+
+- `GET /site/` → `data: {site}`, read once when the storefront opens (the header, the footer and the contact page draw from it):
+
+  ```json
+  {"site": {
+    "name": "GoCart", "tagline": "Everyday things, delivered",
+    "logo": "http://host/media/site/ab12.png",
+    "announcement": {"text": "Flash Sale!", "link": "/products/flash-sale"},
+    "contact": {"email": "", "phone": "", "address": "", "opening_hours": "", "map_url": ""},
+    "social_links": [{"platform": "facebook", "url": "https://..."}],
+    "footer_pages": {"company": [{"slug": "about-us", "title": "About Us"}], "service": [], "legal": []}
+  }}
+  ```
+
+  - `logo` is an absolute URL, or `null`: the storefront then uses the logo that ships with it.
+  - `announcement` is `null` unless the admin switched the bar on and wrote a text. `link` is a path of the shop
+    (`/products/flash-sale`), an `https://…` address, or `null` (plain text). Never `javascript:` or `//host`.
+  - `contact` strings are `""` when not set; `map_url` is the `src` of an embedded Google or OpenStreetMap map (nothing
+    else is accepted), for an `<iframe>`.
+  - `social_links` are the active ones in the admin's order. `platform` is one of `facebook, instagram, x, youtube,
+    linkedin, tiktok, whatsapp, telegram`; `url` is `http(s)`.
+  - `footer_pages` are the **published** pages the admin put in a footer group, each group in the admin's order. Open a
+    page at `/pages/<slug>` in the storefront.
+  - A shop that has saved nothing yet still answers (`name: "My Shop"`, everything else empty). Reading never writes.
+- `GET /site/pages/<slug>/` → `data: {page: {slug, title, body, updated_at}}`. `body` is HTML that has already been cleaned
+  of scripts, event handlers and styles (the same allow-list as product descriptions), so it is safe to render as HTML.
+  An unpublished or unknown slug is the same `404` (`There is no such page.`).
+- `GET /site/faq/` → `data: {faqs: [{category, question, answer}]}`, the active questions in the admin's order;
+  `category` is `General` when left empty; `answer` is plain text (a new line is a new line). No questions → `[]`.
+- `POST /site/contact/` `{name, email, message, phone?, subject?}` → `201`, `data: null`,
+  `message: "Thank you. We have your message and will get back to you soon."`. The message is stored for the staff (Django
+  admin: **Contact messages**, "handled" tick). `name` ≤ 100, `subject` ≤ 150, `phone` ≤ 30, `message` 5-2000 characters, `email`
+  valid. `400` names the field (`field_errors`). Throttle scope `contact`, **5/hour per client IP**, refused messages count.
+- `POST /site/newsletter/` `{email}` → `200`, `data: null`, `message: "Thank you for subscribing."`. The answer is the
+  same for a new address, one already on the list and one in another case: the form must not tell a stranger whether an
+  address is listed. An address the staff switched off is switched on again. Throttle scope `newsletter`, **10/hour per IP**.
+  There is no e-mail sending yet, so no unsubscribe link either; the staff switch an address off in the admin.

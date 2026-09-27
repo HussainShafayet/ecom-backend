@@ -2408,6 +2408,239 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/site/:
+    get:
+      operationId: site_retrieve
+      description: 'The storefront reads this once when it opens: the header, the
+        footer and the contact page draw from it.'
+      summary: The shop's name, logo, contact details, social links, announcement
+        and footer pages
+      tags:
+      - site
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/SitePayload'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/site/contact/:
+    post:
+      operationId: site_contact_create
+      description: Stored for the staff to read in the admin. Rate limited per client
+        IP.
+      summary: Send the shop a message (guests too)
+      tags:
+      - site
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactMessageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContactMessageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContactMessageRequest'
+        required: true
+      responses:
+        '201':
+          description: No response body
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    nullable: true
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/site/faq/:
+    get:
+      operationId: site_faq_retrieve
+      description: Everything here is public. Who is asking does not matter, so a
+        stale token can not turn a call into a 401.
+      summary: The frequently asked questions
+      tags:
+      - site
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/FaqPayload'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/site/newsletter/:
+    post:
+      operationId: site_newsletter_create
+      description: Always answers 200 with the same message, whether the address was
+        new or already on the list. Rate limited per client IP.
+      summary: Subscribe an e-mail address to the newsletter (guests too)
+      tags:
+      - site
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewsletterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NewsletterRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NewsletterRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    nullable: true
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/site/pages/{slug}/:
+    get:
+      operationId: site_pages_retrieve
+      description: Everything here is public. Who is asking does not matter, so a
+        stale token can not turn a call into a 401.
+      summary: One page an admin wrote (About us, Privacy policy, ...)
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - site
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/StaticPagePayload'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
     ActionEnum:
@@ -2475,6 +2708,19 @@ components:
       required:
       - address
       - shipping_type
+    Announcement:
+      type: object
+      properties:
+        text:
+          type: string
+        link:
+          type: string
+          nullable: true
+          description: A page of the shop (/products/flash-sale), https://..., or
+            null.
+      required:
+      - link
+      - text
     BlankEnum:
       enum:
       - ''
@@ -2763,6 +3009,52 @@ components:
       - media_files
       - name
       - sizes
+    ContactDetails:
+      type: object
+      properties:
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        opening_hours:
+          type: string
+        map_url:
+          type: string
+          description: 'The src of an embedded map; empty: show no map.'
+      required:
+      - address
+      - email
+      - map_url
+      - opening_hours
+      - phone
+    ContactMessageRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        phone:
+          type: string
+          maxLength: 30
+        subject:
+          type: string
+          maxLength: 150
+        message:
+          type: string
+          minLength: 5
+          maxLength: 2000
+      required:
+      - email
+      - message
+      - name
     ContentItem:
       type: object
       properties:
@@ -2864,6 +3156,30 @@ components:
             type: string
             format: binary
           description: Photos (JPEG, PNG, WebP) and videos (MP4, WebM).
+    Faq:
+      type: object
+      properties:
+        category:
+          type: string
+          description: '`General` when the admin left it empty.'
+        question:
+          type: string
+        answer:
+          type: string
+          description: Plain text; a new line is a new line.
+      required:
+      - answer
+      - category
+      - question
+    FaqPayload:
+      type: object
+      properties:
+        faqs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Faq'
+      required:
+      - faqs
     FieldEnum:
       enum:
       - phone_number
@@ -2872,6 +3188,36 @@ components:
       description: |-
         * `phone_number` - phone_number
         * `email` - email
+    FooterPage:
+      type: object
+      properties:
+        slug:
+          type: string
+          description: Open it at /pages/<slug>.
+        title:
+          type: string
+      required:
+      - slug
+      - title
+    FooterPages:
+      type: object
+      properties:
+        company:
+          type: array
+          items:
+            $ref: '#/components/schemas/FooterPage'
+        service:
+          type: array
+          items:
+            $ref: '#/components/schemas/FooterPage'
+        legal:
+          type: array
+          items:
+            $ref: '#/components/schemas/FooterPage'
+      required:
+      - company
+      - legal
+      - service
     GenderEnum:
       enum:
       - male
@@ -2941,6 +3287,16 @@ components:
           type: string
       required:
       - name
+    NewsletterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+      required:
+      - email
     OTPSent:
       type: object
       properties:
@@ -3508,6 +3864,26 @@ components:
       - phone_number
       - shipping_address
       - shipping_type
+    PlatformEnum:
+      enum:
+      - facebook
+      - instagram
+      - x
+      - youtube
+      - linkedin
+      - tiktok
+      - whatsapp
+      - telegram
+      type: string
+      description: |-
+        * `facebook` - Facebook
+        * `instagram` - Instagram
+        * `x` - X (Twitter)
+        * `youtube` - YouTube
+        * `linkedin` - LinkedIn
+        * `tiktok` - TikTok
+        * `whatsapp` - WhatsApp
+        * `telegram` - Telegram
     ProductDetail:
       type: object
       description: The card plus everything the detail page shows. `colors` / `sizes`
@@ -4179,6 +4555,46 @@ components:
           $ref: '#/components/schemas/Tokens'
       required:
       - tokens
+    Site:
+      type: object
+      properties:
+        name:
+          type: string
+        tagline:
+          type: string
+        logo:
+          type: string
+          format: uri
+          nullable: true
+          description: 'null: use the logo that ships with the storefront.'
+        announcement:
+          allOf:
+          - $ref: '#/components/schemas/Announcement'
+          nullable: true
+          description: 'null: no bar.'
+        contact:
+          $ref: '#/components/schemas/ContactDetails'
+        social_links:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialLink'
+        footer_pages:
+          $ref: '#/components/schemas/FooterPages'
+      required:
+      - announcement
+      - contact
+      - footer_pages
+      - logo
+      - name
+      - social_links
+      - tagline
+    SitePayload:
+      type: object
+      properties:
+        site:
+          $ref: '#/components/schemas/Site'
+      required:
+      - site
     SizeOption:
       type: object
       properties:
@@ -4208,6 +4624,42 @@ components:
       - discount_price
       - name
       - variant_id
+    SocialLink:
+      type: object
+      properties:
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+        url:
+          type: string
+          format: uri
+      required:
+      - platform
+      - url
+    StaticPage:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+          description: HTML, already cleaned of scripts and styles.
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - body
+      - slug
+      - title
+      - updated_at
+    StaticPagePayload:
+      type: object
+      properties:
+        page:
+          $ref: '#/components/schemas/StaticPage'
+      required:
+      - page
     StatusEnum:
       enum:
       - pending

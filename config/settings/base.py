@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "apps.addresses",
     "apps.catalog",
     "apps.content",
+    "apps.siteconfig",
     "apps.wishlist",
     "apps.cart",
     "apps.orders",
@@ -161,6 +162,8 @@ REST_FRAMEWORK = {
         "order": env("THROTTLE_ORDER", default="30/hour"),
         "order_track": env("THROTTLE_ORDER_TRACK", default="30/hour"),  # a guest looking an order up, per IP; misses count
         "review": env("THROTTLE_REVIEW", default="30/hour"),  # per signed-in customer: writing or editing a review
+        "contact": env("THROTTLE_CONTACT", default="5/hour"),  # a visitor writing to the shop, per IP
+        "newsletter": env("THROTTLE_NEWSLETTER", default="10/hour"),  # a visitor subscribing, per IP
     },
 }
 
