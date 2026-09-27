@@ -5,7 +5,8 @@ it (same calls, same spelling, same payloads: config/frontend_calls.py lists the
     python manage.py runserver                     # another terminal; .env needs OTP_BACKEND=...BrowserOTPBackend
     python scripts/e2e_smoke.py [--server http://127.0.0.1:8000] [--origin http://localhost:3000]
 
-What it does: browses as a guest, places a guest order, signs up (OTP), merges a guest cart and favourites, edits the
+What it does: browses as a guest (also the shop's identity, pages and FAQ, and writes to the contact form and the newsletter),
+places a guest order, signs up (OTP), merges a guest cart and favourites, edits the
 profile (picture, e-mail with its own OTP) and addresses, works the cart and wishlist, checks out, has the order
 delivered (the one staff step, done through `orders.services.change_status`), reviews the product with a photo and a
 video, edits the review the way the frontend does, refreshes and revokes its tokens. Every response is checked for the
@@ -43,6 +44,7 @@ from apps.catalog.models import Product, ProductVariant  # noqa: E402
 from apps.orders import services as order_services  # noqa: E402
 from apps.orders.models import Order  # noqa: E402
 from apps.reviews.models import Review  # noqa: E402
+from apps.siteconfig.models import ContactMessage, NewsletterSubscriber, StaticPage  # noqa: E402
 from config.frontend_calls import FRONTEND_CALLS, api_path  # noqa: E402
 
 MP4 = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + b"\x00" * 64
@@ -155,6 +157,8 @@ def main():
     api = Client(args.server, args.origin)
     phone = f"+88019{random.randrange(10**8):08d}"
     email = f"smoke.{uuid.uuid4().hex[:8]}@example.com"
+    site_email = f"smoke.site.{uuid.uuid4().hex[:8]}@example.com"  # the contact form and the newsletter box
+    page_slug = f"smoke-{uuid.uuid4().hex[:8]}"
     media_before = set(glob.glob(str(settings.MEDIA_ROOT / "**" / "*"), recursive=True))
     order_ids, user = [], None
     saved = {}
@@ -204,6 +208,30 @@ def main():
         status, body, _ = api.call("GET", "/content/checkout/")
         ok("GET /content/checkout/ as a guest -> delivery charges, no user_info",
            status == 200 and {"inside_dhaka", "outside_dhaka"} <= body["data"]["delivery_charges"].keys() and body["data"]["user_info"] is None, body)
+
+        phase("Guest: the shop's identity, its pages, the FAQ, the contact form and the newsletter (publicApi)")
+        StaticPage.objects.create(slug=page_slug, title="Smoke page", body="<h2>Hi</h2><script>alert(1)</script>", footer_group="service")
+        status, body, _ = api.call("GET", "/site/")
+        site = body["data"]["site"] if status == 200 else {}
+        ok("GET /site/ -> the name, contact details, social links and footer pages",
+           status == 200 and {"name", "logo", "announcement", "contact", "social_links", "footer_pages"} <= site.keys(), body)
+        ok("a published page put in the footer is listed there", any(page["slug"] == page_slug for page in site.get("footer_pages", {}).get("service", [])), site.get("footer_pages"))
+        status, body, _ = api.call("GET", "/site/pages/{slug}/", slug=page_slug)
+        ok("GET /site/pages/{slug}/ -> its title and its HTML without the script",
+           status == 200 and body["data"]["page"]["title"] == "Smoke page" and body["data"]["page"]["body"] == "<h2>Hi</h2>", body)
+        status, body, _ = api.call("GET", "/site/pages/{slug}/", slug="smoke-no-such-page")
+        ok("GET /site/pages/{slug}/ for a page that does not exist -> 404", status == 404 and body["success"] is False, body)
+        status, body, _ = api.call("GET", "/site/faq/")
+        ok("GET /site/faq/ -> a list of questions", status == 200 and isinstance(body["data"]["faqs"], list), body)
+        status, body, _ = api.call("POST", "/site/contact/", body={"name": "Smoke Tester", "email": "not-an-email", "message": "Hello there"})
+        ok("POST /site/contact/ with a wrong e-mail -> 400 naming the field", status == 400 and "email" in body.get("field_errors", {}), body)
+        status, body, _ = api.call("POST", "/site/contact/", body={"name": "Smoke Tester", "email": site_email, "message": "Hello from the smoke test"})
+        ok("POST /site/contact/ -> 201, stored for the staff", status == 201 and ContactMessage.objects.filter(email=site_email).count() == 1, body)
+        status, body, _ = api.call("POST", "/site/newsletter/", body={"email": site_email.upper()})
+        first_answer = body
+        status, body, _ = api.call("POST", "/site/newsletter/", body={"email": site_email})
+        ok("POST /site/newsletter/ twice (any case) -> the same answer, one subscriber",
+           status == 200 and body == first_answer and NewsletterSubscriber.objects.filter(email=site_email).count() == 1, body)
 
         phase("Guest: place an order (publicApi); the prices the client sends are ignored")
         status, body, _ = api.call("POST", "/orders/", body=checkout_body([(first, 1)]))
@@ -454,6 +482,9 @@ def main():
             order.payments.all().delete()
             order.delete()
         User.objects.filter(phone_number=phone).delete()
+        ContactMessage.objects.filter(email=site_email).delete()
+        NewsletterSubscriber.objects.filter(email=site_email).delete()
+        StaticPage.objects.filter(slug=page_slug).delete()
         for pk, before in saved.items():
             ProductVariant.objects.filter(pk=before["variant"]).update(stock_quantity=before["stock"])
             Product.objects.filter(pk=pk).update(total_orders=before["orders"], total_reviews=before["reviews"], avg_rating=before["rating"])
@@ -464,7 +495,8 @@ def main():
         leftovers = set(glob.glob(str(settings.MEDIA_ROOT / "**" / "*"), recursive=True)) - media_before
         leftovers = {path for path in leftovers if os.path.isfile(path)}
         ok("stock and counters are back, and no smoke customer, order, review or file is left",
-           restored and not User.objects.filter(phone_number=phone).exists() and not Order.objects.filter(pk__in=order_ids).exists() and not leftovers,
+           restored and not User.objects.filter(phone_number=phone).exists() and not Order.objects.filter(pk__in=order_ids).exists() and not leftovers
+           and not ContactMessage.objects.filter(email=site_email).exists() and not StaticPage.objects.filter(slug=page_slug).exists(),
            f"restored={restored}, files left={sorted(leftovers)}")
 
     phase("Result")

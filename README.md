@@ -120,7 +120,7 @@ python manage.py makemigrations && python manage.py migrate
 python manage.py spectacular --file openapi.yaml --validate --fail-on-warn   # regenerate + validate schema (a test fails when it is stale)
 python scripts/e2e_smoke.py                                                  # a whole customer visit against the running dev server
 python manage.py check --deploy --settings=config.settings.prod              # production readiness (needs prod env vars)
-python manage.py seed_catalog && python manage.py seed_content               # demo products, sliders and banners (dev only)
+python manage.py seed_catalog && python manage.py seed_content && python manage.py seed_site   # demo products, sliders and banners, and a sample shop identity, pages and FAQ (dev only)
 ```
 
 ### Smoke test: the whole shop against a running server
@@ -155,6 +155,18 @@ and contents only, never the name or address. What staff write in the status not
 Every order also has a **payment** (cash on delivery: pending when placed, paid when the order is delivered or marked
 paid, cancelled or refunded when the order is). Staff see them, read-only, under **Payments**; move the order and the
 payment follows.
+
+## The shop's own content (staff)
+
+Everything the storefront shows that is not a product is set in the Django admin under **Site**, nothing is written into
+the frontend: **Site settings** (one page: name, tagline, logo, the announcement bar above the header, e-mail, phone,
+address, opening hours, a map, the social links), **Static pages** (About us, Privacy policy, Terms, ...: HTML, cleaned of
+scripts when saved; give a page a footer group and it appears in the footer; untick *Is published* to take it offline),
+**FAQ**, **Contact messages** (what visitors wrote through the contact form: read them and tick *Is handled*) and
+**Newsletter subscribers** (search, switch off, download as CSV). `python manage.py seed_site` fills a development
+database with a sample identity, four pages and a FAQ (it leaves whatever the shop already has alone). The public reads
+are `GET /site/`, `/site/pages/<slug>/`, `/site/faq/`; the contact form and the newsletter box are `POST /site/contact/`
+(`THROTTLE_CONTACT`) and `POST /site/newsletter/` (`THROTTLE_NEWSLETTER`). Nothing is e-mailed yet: staff read messages in the admin.
 
 ## Production notes
 
@@ -205,6 +217,7 @@ apps/accounts/     custom phone User, OTP register/login, JWT refresh/logout, pr
 apps/addresses/    saved shipping addresses (shop-specific, not part of the template base)
 apps/catalog/      categories, brands, products, variants, media; the public product/category API and /content/shop
 apps/content/      editable sliders and banners of the six shop pages (/content/pages/<page>/)
+apps/siteconfig/   the shop's name, logo, contact details, social links, announcement bar; About/Privacy/Terms pages, FAQ, contact form, newsletter (/site/…)
 apps/wishlist/     favourites (/accounts/favourite/) and the catalog's `is_favourite`
 apps/cart/         the signed-in cart (/accounts/cart/) and the merge of a guest's browser cart at sign-in
 apps/orders/       checkout: POST /orders/ (guests too), /content/checkout/, delivery charges, order status flow + admin

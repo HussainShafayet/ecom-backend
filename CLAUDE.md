@@ -36,7 +36,7 @@ python scripts/e2e_smoke.py              # a whole customer visit against the RU
 ## Structure
 
 `config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` · `scripts/` ·
-`apps/{core,accounts,addresses,catalog,content,wishlist,cart,orders,payments,reviews}` (built step by step) ·
+`apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews}` (built step by step) ·
 `docs/API_CONTRACT.md` · `openapi.yaml`
 
 ## API contract

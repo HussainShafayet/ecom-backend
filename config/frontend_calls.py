@@ -36,6 +36,12 @@ FRONTEND_CALLS = [
     ("GET", "/orders/{number}/"),
     ("POST", "/orders/{number}/cancel/"),
     ("GET", "/orders/track/"),
+    # the shop's identity, pages, FAQ, contact form and newsletter (services/siteService.js)
+    ("GET", "/site/"),
+    ("GET", "/site/pages/{slug}/"),
+    ("GET", "/site/faq/"),
+    ("POST", "/site/contact/"),
+    ("POST", "/site/newsletter/"),
     # auth (redux/slice/authSlice.js)
     ("POST", "/accounts/register/"),
     ("POST", "/accounts/verify-otp/"),

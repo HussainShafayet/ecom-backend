@@ -1,4 +1,15 @@
 """Small helpers shared by every app."""
+from django.core.files.storage import default_storage
+
+
+def absolute_url(request, file):
+    """Absolute URL of a stored file (a FieldFile or a bare storage name), or None when there is none.
+    The frontend lives on another origin, so a media URL is never relative."""
+    name = getattr(file, "name", file)
+    if not name:
+        return None
+    url = default_storage.url(name)
+    return request.build_absolute_uri(url) if request is not None else url
 
 
 def mask_phone(phone):
