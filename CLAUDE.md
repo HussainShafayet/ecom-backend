@@ -31,13 +31,14 @@ python manage.py runserver | migrate | makemigrations | createsuperuser
 pytest                                   # every step must end green
 python manage.py spectacular --file openapi.yaml --validate --fail-on-warn   # commit the result: a test compares it
 python scripts/e2e_smoke.py              # a whole customer visit against the RUNNING dev server (dev DB only)
+python manage.py setup_roles             # create/update the Catalog Manager & Order Manager groups (safe in prod)
 ```
 
 ## Structure
 
 `config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` · `scripts/` ·
 `apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews}` (built step by step) ·
-`docs/API_CONTRACT.md` · `openapi.yaml`
+`docs/API_CONTRACT.md` · `docs/ROADMAP.md` (what's built vs. still missing, priority order) · `openapi.yaml`
 
 ## API contract
 
@@ -89,6 +90,14 @@ schema together, and never diverge from what the frontend calls without the user
 - `apps/accounts` (and `core`) must not import shop apps (catalog/cart/orders...): this base is reused for other
   projects. Cross-app hooks go through signals, e.g. `accounts.signals.guest_data_received` (guest cart/favorites
   sent at sign-in; the cart/wishlist apps connect a receiver). Receivers run with `send_robust`.
+- Staff access is two Django Groups (`Catalog Manager`, `Order Manager`), kept in sync by
+  `apps/accounts/management/commands/setup_roles.py` — `group.permissions.set(...)`, not `.add()`, so editing that
+  file's permission tables and rerunning the command corrects an existing group everywhere it's run, not just adds.
+  It looks up permissions by `app_label`/`codename` string (never imports catalog/orders/etc., per the rule above)
+  and never touches a `User`'s `groups` or `user_permissions` — assigning someone to a role stays a manual step in
+  Admin > Users. The Owner role is `is_superuser=True`, never a Group. Never grant a permission a ModelAdmin already
+  blocks with a `has_*_permission` override (see the file's own docstring for the current list) — the block should
+  stay the single source of truth, not a permission relied on "just in case".
 - A DRF view with `authentication_classes = []` must define `get_authenticate_header()`, otherwise DRF turns every 401
   into a 403 (see `PublicAuthView`). Public auth views ignore the Authorization header on purpose: the frontend sends
   its stale access token to refresh/logout.
