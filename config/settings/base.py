@@ -263,3 +263,17 @@ LOGGING = {
     },
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="INFO")},
 }
+
+# --- error tracking (Sentry) -------------------------------------------------------------------------------
+# Off unless SENTRY_DSN is set. Unhandled errors and ERROR log records are reported. send_default_pii=False keeps
+# customers' phone numbers, e-mails, IPs and cookies out of the reports.
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=env("SENTRY_ENVIRONMENT", default="production"),
+        traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
+        send_default_pii=False,
+    )

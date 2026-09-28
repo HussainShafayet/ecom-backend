@@ -1,5 +1,7 @@
 # GoCart Backend
 
+[![CI](https://github.com/HussainShafayet/ecom-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/HussainShafayet/ecom-backend/actions/workflows/ci.yml)
+
 Django + Django REST Framework API for the GoCart React storefront (`../ecom`). PostgreSQL, JWT (simplejwt),
 OpenAPI via drf-spectacular. The API shape is dictated by the frontend, see [docs/API_CONTRACT.md](docs/API_CONTRACT.md).
 
@@ -122,7 +124,11 @@ python scripts/e2e_smoke.py                                                  # a
 python manage.py check --deploy --settings=config.settings.prod              # production readiness (needs prod env vars)
 python manage.py seed_catalog && python manage.py seed_content && python manage.py seed_site   # demo products, sliders and banners, and a sample shop identity, pages and FAQ (dev only)
 python manage.py setup_roles                                                                   # create/update the Catalog Manager & Order Manager groups (safe in prod too)
+scripts/backup.sh                                                                               # back up the database + media (see Backups below)
 ```
+
+Every push/PR to `main` runs the test suite and the OpenAPI schema check in GitHub Actions
+(`.github/workflows/ci.yml`) against a fresh PostgreSQL service container.
 
 ### Smoke test: the whole shop against a running server
 
@@ -255,12 +261,40 @@ Run `python manage.py check --deploy` with the production environment: it must s
 - **Editing stock in the admin** overwrites the number the form was opened with: an order placed meanwhile is lost from
   the stock count. Do stock corrections when the shop is quiet. (The product's own counters, orders/views/reviews/rating,
   are left alone by an admin save.)
+- **Error tracking (optional).** Set `SENTRY_DSN` to report unhandled errors (and `ERROR`-level logs) to Sentry;
+  empty (the default) keeps it off. No personal data is sent (`send_default_pii=False`) — see
+  `config/settings/base.py`. A Sentry alert rule (Sentry dashboard, not this repo: Settings > Integrations > GitHub,
+  then an Alert rule with action "Create a new GitHub issue") opens a GitHub issue here automatically when a new
+  error shows up — reconfigure it in Sentry if it stops firing, there's nothing to fix in code.
+
+## Backups
+
+`scripts/backup.sh` dumps the database (`pg_dump --format=custom`, restorable with `pg_restore`) and tars the
+local `media/` folder into `BACKUP_DIR` (default `./backups`, gitignored), then deletes anything older than
+`BACKUP_KEEP_DAYS` (default 14). It reads `DATABASE_URL`/`BACKUP_DIR`/`BACKUP_KEEP_DAYS` from the real environment
+or `.env`. Run it from cron, e.g. daily at 3am:
+
+```cron
+0 3 * * * cd /path/to/backend && scripts/backup.sh >> /var/log/gocart-backup.log 2>&1
+```
+
+Restore:
+
+```bash
+pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" backups/db-<timestamp>.dump
+tar xzf backups/media-<timestamp>.tar.gz   # extracts to ./media
+```
+
+Copy backups offsite (rclone, S3, ...) — a copy on the same disk as the database does not survive a disk failure —
+and restore one periodically to confirm the dumps are actually usable. If `MEDIA_STORAGE_BACKEND` is set to S3,
+the media tar step is skipped: back up and version the bucket itself instead.
 
 ## Layout
 
 ```
+.github/workflows/ci.yml   tests + OpenAPI schema check on every push/PR to main
 config/            settings/{base,dev,prod}.py, urls.py, api_urls.py (everything under /api/v1/), frontend_calls.py, tests/
-scripts/           e2e_smoke.py: a whole customer visit against the running dev server
+scripts/           e2e_smoke.py: a whole customer visit against the running dev server; backup.sh: database + media backup
 apps/core/         response envelope, error handling, pagination, money helpers, URL helper, health check
 apps/accounts/     custom phone User, OTP register/login, JWT refresh/logout, profile (+ OTP-verified phone/email change, picture)
 apps/addresses/    saved shipping addresses (shop-specific, not part of the template base)
