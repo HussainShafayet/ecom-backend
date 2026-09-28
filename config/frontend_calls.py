@@ -30,6 +30,8 @@ FRONTEND_CALLS = [
     ("GET", "/content/pages/category"),
     ("GET", "/content/shop"),
     ("GET", "/content/checkout/"),
+    # coupons (services/couponService.js, redux/slice/checkoutSlice.js)
+    ("POST", "/coupons/validate/"),
     # orders (redux/slice/checkoutSlice.js, redux/slice/orderSlice.js)
     ("POST", "/orders/"),
     ("GET", "/orders/"),

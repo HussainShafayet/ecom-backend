@@ -64,6 +64,9 @@ class PlaceOrderSerializer(serializers.Serializer):
         help_text='"cash" and "cod" both mean cash on delivery.',
     )
     items = OrderItemsField()
+    coupon_code = serializers.CharField(
+        required=False, allow_blank=True, max_length=40, help_text="Optional. A bad or expired code is a 400."
+    )
 
     def validate(self, attrs):
         # Same rule as a saved address: inside Dhaka needs the area, outside needs division, district and thana,
@@ -76,6 +79,7 @@ class PlaceOrderSerializer(serializers.Serializer):
             if name not in needed:
                 attrs[name] = ""
         attrs["email"] = attrs.get("email") or ""
+        attrs["coupon_code"] = attrs.get("coupon_code") or ""
         return attrs
 
 
@@ -87,6 +91,8 @@ class OrderPlacedSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
     subtotal = serializers.DecimalField(**MONEY)
     delivery_charge = serializers.DecimalField(**MONEY)
+    discount_amount = serializers.DecimalField(**MONEY, help_text="What the coupon took off. 0 when there was none.")
+    coupon_code = serializers.CharField(help_text='"" when no coupon was used.')
     total = serializers.DecimalField(**MONEY)
 
 
@@ -171,6 +177,7 @@ class OrderDetailSerializer(OrderSummarySerializer):
     can_cancel = serializers.SerializerMethodField(
         help_text="True while the order is pending: only then may the customer cancel it."
     )
+    coupon_code = serializers.SerializerMethodField(help_text='"" when no coupon was used.')
 
     class Meta(OrderSummarySerializer.Meta):
         fields = OrderSummarySerializer.Meta.fields + (
@@ -185,6 +192,8 @@ class OrderDetailSerializer(OrderSummarySerializer):
             "shipping_address",
             "subtotal",
             "delivery_charge",
+            "discount_amount",
+            "coupon_code",
             "payment",
             "history",
             "can_cancel",
@@ -201,13 +210,18 @@ class OrderDetailSerializer(OrderSummarySerializer):
     def get_can_cancel(self, order) -> bool:
         return order.status == Order.Status.PENDING
 
+    def get_coupon_code(self, order) -> str:
+        return order.coupon.code if order.coupon_id else ""
+
 
 class OrderTrackingSerializer(OrderDetailSerializer):
     """What a guest gets for an order number and its phone number: the progress and what was ordered, nothing about
     who it is for or where it goes (an order number is easy to guess; the phone number is the only secret)."""
 
     class Meta(OrderSummarySerializer.Meta):
-        fields = OrderSummarySerializer.Meta.fields + ("subtotal", "delivery_charge", "payment", "history")
+        fields = OrderSummarySerializer.Meta.fields + (
+            "subtotal", "delivery_charge", "discount_amount", "coupon_code", "payment", "history"
+        )
 
 
 class OrderTrackingQuerySerializer(serializers.Serializer):

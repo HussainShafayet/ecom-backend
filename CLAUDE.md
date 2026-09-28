@@ -37,7 +37,7 @@ python manage.py setup_roles             # create/update the Catalog Manager & O
 ## Structure
 
 `config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` · `scripts/` ·
-`apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews,notifications}` (built step by step) ·
+`apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews,notifications,coupons}` (built step by step) ·
 `docs/API_CONTRACT.md` · `docs/ROADMAP.md` (what's built vs. still missing, priority order) · `openapi.yaml`
 
 ## API contract
@@ -77,6 +77,14 @@ schema together, and never diverge from what the frontend calls without the user
   (`NOTIFICATION_BACKEND`, dotted path; `ConsoleNotificationBackend` logs to the console) — but unlike
   `OTP_BACKEND`, `prod.py` does **not** require a real class here, since no notification is safety/security-critical
   the way OTP delivery is.
+- Coupons: `apps.coupons.services` is the only code that reads or redeems a `Coupon`. `place_order()` calls
+  `apply_coupon_to_order()` inside its own transaction, after the real subtotal is known — never against a
+  client-sent discount — and locks the coupon row after the variants but before the day's order-number counter
+  (extending `place_order`'s own lock order, see its module docstring). `change_status()` calls
+  `release_coupon_usage()` on a move to `CANCELLED`, before it restocks, for the same lock-order reason: a customer
+  who cancels and retries is not blocked by their own cancelled attempt. `POST /coupons/validate/` previews the
+  discount (guest-writable, `ScopedRateThrottle` scope `coupon`) but is not required — `POST /orders/` redeems a
+  `coupon_code` on its own.
 - Reviews: written only through `reviews.services.create_review()` / `update_review()` (needs a DELIVERED order of the
   customer containing the product; one per customer and product). The product's `total_reviews` / `avg_rating` are
   derived data: `refresh_product_rating()` recounts them from the approved reviews (locking the product row first),

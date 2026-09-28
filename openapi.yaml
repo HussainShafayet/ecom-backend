@@ -1233,6 +1233,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/coupons/validate/:
+    post:
+      operationId: coupons_validate_create
+      description: '`subtotal` is only what the cart already shows, to preview the
+        discount: placing the order recomputes everything from the database. A bad,
+        expired, exhausted or already-used code is a 400 with one sentence in `errors`.'
+      summary: Preview a coupon's discount against a subtotal (guests too)
+      tags:
+      - coupons
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponValidateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CouponValidateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CouponValidateRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/CouponPreview'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/health/:
     get:
       operationId: health_retrieve
@@ -1317,10 +1370,12 @@ paths:
     post:
       operationId: orders_create
       description: 'Prices and totals in the body are ignored: the server prices every
-        line from the catalog and adds the configured delivery charge. Every problem
-        (unknown or hidden product, stock, minimum order quantity, ...) comes back
-        together as a 400 with `errors: [sentence, ...]`, and nothing is written.
-        A signed-in customer''s ordered lines leave their server cart.'
+        line from the catalog and adds the configured delivery charge. An optional
+        `coupon_code` is redeemed against the server''s own subtotal, never the client''s.
+        Every problem (unknown or hidden product, stock, minimum order quantity, a
+        bad or expired coupon, ...) comes back together as a 400 with `errors: [sentence,
+        ...]`, and nothing is written. A signed-in customer''s ordered lines leave
+        their server cart.'
       summary: Place an order (guest or signed in)
       tags:
       - orders
@@ -3086,6 +3141,50 @@ components:
       - media_type
       - order
       - type
+    CouponPreview:
+      type: object
+      description: What `POST /coupons/validate/` answers.
+      properties:
+        discount_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        total:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: subtotal - discount_amount.
+      required:
+      - discount_amount
+      - total
+    CouponValidateRequest:
+      type: object
+      description: |-
+        The body of `POST /coupons/validate/`. `subtotal` is the cart's own subtotal (what the page already shows),
+        used only to preview the discount; placing the order recomputes everything from the database and ignores it.
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 40
+        subtotal:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+        phone_number:
+          type: string
+          maxLength: 14
+      required:
+      - code
+      - subtotal
     DeliveryCharges:
       type: object
       properties:
@@ -3378,6 +3477,17 @@ components:
           maximum: 10000000000
           minimum: 0
           exclusiveMaximum: true
+        discount_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+          description: What the coupon took off. 0 when there was none.
+        coupon_code:
+          type: string
+          readOnly: true
+          description: '"" when no coupon was used.'
         payment:
           allOf:
           - $ref: '#/components/schemas/OrderPayment'
@@ -3397,6 +3507,7 @@ components:
             cancel it.'
       required:
       - can_cancel
+      - coupon_code
       - created_at
       - delivery_charge
       - history
@@ -3581,6 +3692,17 @@ components:
           minimum: -10000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+        discount_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: What the coupon took off. 0 when there was none.
+        coupon_code:
+          type: string
+          description: '"" when no coupon was used.'
         total:
           type: number
           format: double
@@ -3589,8 +3711,10 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
       required:
+      - coupon_code
       - created_at
       - delivery_charge
+      - discount_amount
       - order_id
       - status
       - subtotal
@@ -3696,6 +3820,17 @@ components:
           maximum: 10000000000
           minimum: 0
           exclusiveMaximum: true
+        discount_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+          description: What the coupon took off. 0 when there was none.
+        coupon_code:
+          type: string
+          readOnly: true
+          description: '"" when no coupon was used.'
         payment:
           allOf:
           - $ref: '#/components/schemas/OrderPayment'
@@ -3709,6 +3844,7 @@ components:
           readOnly: true
           description: Every status the order has been in, oldest first.
       required:
+      - coupon_code
       - created_at
       - delivery_charge
       - history
@@ -3858,6 +3994,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemInputRequest'
+        coupon_code:
+          type: string
+          description: Optional. A bad or expired code is a 400.
+          maxLength: 40
       required:
       - items
       - name

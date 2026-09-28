@@ -76,9 +76,10 @@ class OrderListCreateView(APIView):
         summary="Place an order (guest or signed in)",
         description=(
             "Prices and totals in the body are ignored: the server prices every line from the catalog and adds the "
-            "configured delivery charge. Every problem (unknown or hidden product, stock, minimum order quantity, "
-            "...) comes back together as a 400 with `errors: [sentence, ...]`, and nothing is written. "
-            "A signed-in customer's ordered lines leave their server cart."
+            "configured delivery charge. An optional `coupon_code` is redeemed against the server's own subtotal, "
+            "never the client's. Every problem (unknown or hidden product, stock, minimum order quantity, a bad or "
+            "expired coupon, ...) comes back together as a 400 with `errors: [sentence, ...]`, and nothing is "
+            "written. A signed-in customer's ordered lines leave their server cart."
         ),
         request=PlaceOrderSerializer,
         responses={201: OrderPlacedSerializer},
@@ -93,6 +94,8 @@ class OrderListCreateView(APIView):
             "created_at": order.created_at,
             "subtotal": order.subtotal,
             "delivery_charge": order.delivery_charge,
+            "discount_amount": order.discount_amount,
+            "coupon_code": order.coupon.code if order.coupon_id else "",
             "total": order.total,
         }
         return api_response(OrderPlacedSerializer(placed).data, message="Order placed.", status=201)

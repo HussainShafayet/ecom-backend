@@ -157,6 +157,16 @@ Every order also has a **payment** (cash on delivery: pending when placed, paid 
 paid, cancelled or refunded when the order is). Staff see them, read-only, under **Payments**; move the order and the
 payment follows.
 
+## Coupons (staff)
+
+Staff create and edit promo codes in the Django admin under **Coupons**: a percentage or fixed amount off, an
+optional minimum order amount and a cap on the discount, an optional total-use and per-customer-use limit, a
+validity window (`valid_from`/`valid_until`) and a manual **Is active** switch — no code change needed to add,
+change or retire one. A customer applies a code at checkout (`coupon_code` on `POST /orders/`, or previewed first
+with `POST /coupons/validate/`); the discount is always computed from the coupon row and the order's own subtotal,
+never from anything the client sent. A cancelled order gives its coupon's use back, so a customer who cancels and
+retries is not blocked by their own cancelled attempt. See `docs/API_CONTRACT.md` section 10.
+
 ## Order notifications (SMS/e-mail)
 
 The customer gets a message when their order is placed, and when staff move it to confirmed/shipped/cancelled/

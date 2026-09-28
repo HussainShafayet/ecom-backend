@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "apps.payments",
     "apps.reviews",
     "apps.notifications",
+    "apps.coupons",
 ]
 
 MIDDLEWARE = [
@@ -165,6 +166,7 @@ REST_FRAMEWORK = {
         "review": env("THROTTLE_REVIEW", default="30/hour"),  # per signed-in customer: writing or editing a review
         "contact": env("THROTTLE_CONTACT", default="5/hour"),  # a visitor writing to the shop, per IP
         "newsletter": env("THROTTLE_NEWSLETTER", default="10/hour"),  # a visitor subscribing, per IP
+        "coupon": env("THROTTLE_COUPON", default="30/hour"),  # previewing a coupon's discount, per IP
     },
 }
 

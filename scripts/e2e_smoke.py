@@ -6,7 +6,7 @@ it (same calls, same spelling, same payloads: config/frontend_calls.py lists the
     python scripts/e2e_smoke.py [--server http://127.0.0.1:8000] [--origin http://localhost:3000]
 
 What it does: browses as a guest (also the shop's identity, pages and FAQ, and writes to the contact form and the newsletter),
-places a guest order, signs up (OTP), merges a guest cart and favourites, edits the
+places a guest order, previews and uses a coupon, signs up (OTP), merges a guest cart and favourites, edits the
 profile (picture, e-mail with its own OTP) and addresses, works the cart and wishlist, checks out, has the order
 delivered (the one staff step, done through `orders.services.change_status`), reviews the product with a photo and a
 video, edits the review the way the frontend does, refreshes and revokes its tokens. Every response is checked for the
@@ -41,6 +41,7 @@ from PIL import Image  # noqa: E402
 
 from apps.accounts.models import User  # noqa: E402
 from apps.catalog.models import Product, ProductVariant  # noqa: E402
+from apps.coupons.models import Coupon  # noqa: E402
 from apps.orders import services as order_services  # noqa: E402
 from apps.orders.models import Order  # noqa: E402
 from apps.reviews.models import Review  # noqa: E402
@@ -159,6 +160,7 @@ def main():
     email = f"smoke.{uuid.uuid4().hex[:8]}@example.com"
     site_email = f"smoke.site.{uuid.uuid4().hex[:8]}@example.com"  # the contact form and the newsletter box
     page_slug = f"smoke-{uuid.uuid4().hex[:8]}"
+    coupon_code = f"SMOKE{uuid.uuid4().hex[:6].upper()}"
     media_before = set(glob.glob(str(settings.MEDIA_ROOT / "**" / "*"), recursive=True))
     order_ids, user = [], None
     saved = {}
@@ -248,6 +250,22 @@ def main():
                status == 200 and body["data"]["status"] == "pending" and body["data"]["items"] and not any(text in json.dumps(body) for text in private), body)
             status, body, _ = api.call("GET", "/orders/track/", query=f"order_id={guest_order.number}&phone_number=%2B8801799999999")
             ok("a wrong phone number is a 404 (the same answer as an unknown order)", status == 404 and body["error"] == "No order matches these details.", body)
+
+        phase("Guest: preview and use a coupon (publicApi)")
+        coupon = Coupon.objects.create(code=coupon_code, discount_type="percentage", discount_value="10.00")
+        status, body, _ = api.call("POST", "/coupons/validate/", body={"code": coupon_code.lower(), "subtotal": "100.00"})
+        ok("POST /coupons/validate/ -> previews the discount, case-insensitively",
+           status == 200 and body["data"] == {"discount_amount": 10.0, "total": 90.0}, body)
+        status, body, _ = api.call("POST", "/coupons/validate/", body={"code": "NOSUCHCODE", "subtotal": "100.00"})
+        ok("an unknown coupon code -> 400, and no use is counted for it", status == 400 and body["success"] is False, body)
+        status, body, _ = api.call("POST", "/orders/", body=checkout_body([(first, 1)], coupon_code=coupon_code))
+        ok("POST /orders/ with a coupon_code -> the discount is applied and stored",
+           status == 201 and body["data"]["discount_amount"] > 0 and body["data"]["coupon_code"] == coupon_code, body)
+        if status == 201:
+            coupon_order = Order.objects.get(number=body["data"]["order_id"])
+            order_ids.append(coupon_order.pk)
+        coupon.refresh_from_db()
+        ok("the coupon's use was counted once", coupon.times_used == 1, coupon.times_used)
 
         # ------------------------------------------------------------------------------------------------------
         phase("Sign up: register, OTP, merge of the guest cart and favourites")
@@ -485,6 +503,7 @@ def main():
         ContactMessage.objects.filter(email=site_email).delete()
         NewsletterSubscriber.objects.filter(email=site_email).delete()
         StaticPage.objects.filter(slug=page_slug).delete()
+        Coupon.objects.filter(code=coupon_code).delete()
         for pk, before in saved.items():
             ProductVariant.objects.filter(pk=before["variant"]).update(stock_quantity=before["stock"])
             Product.objects.filter(pk=pk).update(total_orders=before["orders"], total_reviews=before["reviews"], avg_rating=before["rating"])
@@ -494,9 +513,10 @@ def main():
         )
         leftovers = set(glob.glob(str(settings.MEDIA_ROOT / "**" / "*"), recursive=True)) - media_before
         leftovers = {path for path in leftovers if os.path.isfile(path)}
-        ok("stock and counters are back, and no smoke customer, order, review or file is left",
+        ok("stock and counters are back, and no smoke customer, order, review, coupon or file is left",
            restored and not User.objects.filter(phone_number=phone).exists() and not Order.objects.filter(pk__in=order_ids).exists() and not leftovers
-           and not ContactMessage.objects.filter(email=site_email).exists() and not StaticPage.objects.filter(slug=page_slug).exists(),
+           and not ContactMessage.objects.filter(email=site_email).exists() and not StaticPage.objects.filter(slug=page_slug).exists()
+           and not Coupon.objects.filter(code=coupon_code).exists(),
            f"restored={restored}, files left={sorted(leftovers)}")
 
     phase("Result")

@@ -244,14 +244,16 @@ All media URLs are absolute.
   "shipping_type": "inside_dhaka", "shipping_area": "Gulshan", "shipping": null,
   "shipping_division": "", "shipping_district": "", "shipping_thana": "", "shipping_address": "…",
   "payment_type": "cash",                       // "cash" and "cod" both mean Cash on Delivery
+  "coupon_code": "",                             // optional; see section 10
   "items": [{ "product_id": 1, "variant_id": 3, "quantity": 2, "price": 500 }],
   "sub_total_price": "1000.00", "delivery_charge": 60, "total_price": "1060.00" }
 ```
 
-`201 → {success: true, message: "Order placed.", data: {order_id, status, created_at, subtotal, delivery_charge, total}}`;
-`order_id` is the human-readable, URL-safe order number, e.g. `GC-20260923-0001` (the frontend navigates to
-`/order-confirmation/{order_id}`), and the rest is what that page can show without another call (a guest has no way to
-read the order afterwards except by tracking it, see below).
+`201 → {success: true, message: "Order placed.", data: {order_id, status, created_at, subtotal, delivery_charge,
+discount_amount, coupon_code, total}}`; `order_id` is the human-readable, URL-safe order number, e.g.
+`GC-20260923-0001` (the frontend navigates to `/order-confirmation/{order_id}`), and the rest is what that page can
+show without another call (a guest has no way to read the order afterwards except by tracking it, see below).
+`discount_amount` is `0` and `coupon_code` is `""` when no coupon was used.
 
 **Who can order.** Guests (no token) and signed-in customers. A valid Bearer token attaches the order to that account;
 an expired or invalid token is a `401` (the frontend refreshes it), never a silent guest order. A guest order is
@@ -270,14 +272,17 @@ Any other key (`price`, `sub_total_price`, `delivery_charge`, `total_price`, `sh
 **The server prices everything.** Prices and totals sent by the client are ignored; a mismatch is not an error.
 Each line costs the variant's final price (the variant's own price when it overrides the product's, else the product's
 discount rule, see section 5); `subtotal` is the sum of the lines, `delivery_charge` comes from the configured charge of
-the shipping type (default 60 inside Dhaka, 120 outside), `total = subtotal + delivery_charge`. Everything is stored as
-a snapshot (contact, address, product name, variant label, SKU, unit and base price, delivery charge), so later
-edits to the catalog, the charges or the profile never change a placed order.
+the shipping type (default 60 inside Dhaka, 120 outside), an optional `coupon_code` is redeemed against `subtotal`
+(section 10) for `discount_amount`, `total = subtotal + delivery_charge - discount_amount`. Everything is stored as
+a snapshot (contact, address, product name, variant label, SKU, unit and base price, delivery charge, the coupon
+and its discount), so later edits to the catalog, the charges, a coupon or the profile never change a placed order.
 
 **Errors.** A `400` for: an empty or too long `items` list, a bad field, an unknown, hidden or variant-less product, a
 variant that is not the product's or is inactive, several variants and none chosen, out of stock, more than the stock,
-`quantity` below the product's `minimum_order_quantity`, or a shipping type with no configured delivery charge. All
-the problems of an order are reported **together**, one plain sentence each, and nothing is written:
+`quantity` below the product's `minimum_order_quantity`, a shipping type with no configured delivery charge, or a
+`coupon_code` that does not exist, is not active or valid yet, has expired, is below its minimum order amount, or has
+no uses left (total or for this phone number — see section 10). All the problems of an order are reported
+**together**, one plain sentence each, and nothing is written:
 
 ```jsonc
 { "success": false, "message": "Validation failed.", "error": "Mug is out of stock.",
@@ -325,6 +330,8 @@ when a **`paid` order is refunded**. A **`delivered` order that is refunded is n
 left, and whether they come back sellable is for a person to decide (edit the stock in the admin; returned goods that
 are damaged are corrected the same way). Every one of these statuses is final or moves on only once, so goods are
 never returned twice. A customer can still cancel only a **pending** order (once staff confirm it, a person decides).
+A **cancelled** order also gives back one use of its coupon, if it used one (section 10), so a customer who cancels
+and places a fresh order can reuse a limited-use code.
 
 **Payments** (no endpoint: the frontend offers cash on delivery only, so nothing is exposed to it). Every order gets one
 `Payment` row in the same transaction that places it (`pending`, amount = the order total, method `cod`), and the
@@ -356,8 +363,9 @@ Orders placed before the payments app existed get their payment from a data migr
   list. Order summary: `{order_id, status, status_display, created_at, total, items_count, items: [Item]}`;
   `items_count` counts units.
 - `GET /orders/{order_id}/` → `data: Order` = the summary plus `name, email, phone_number, shipping_type, shipping_area,
-  shipping_division, shipping_district, shipping_thana, shipping_address, subtotal, delivery_charge, can_cancel,
-  payment, history`. `payment` is `{method, method_display, status, status_display, amount, paid_at, refunded_at}` or
+  shipping_division, shipping_district, shipping_thana, shipping_address, subtotal, delivery_charge, discount_amount,
+  coupon_code, can_cancel, payment, history`. `discount_amount` is `0` and `coupon_code` is `""` when no coupon was
+  used. `payment` is `{method, method_display, status, status_display, amount, paid_at, refunded_at}` or
   `null` (the payment of section 6, newest one). `history` is every status the order has been in, oldest first:
   `[{status, status_display, created_at}]` (who moved it and the staff's note are not shown). `can_cancel` is true
   while the order is `pending`. Somebody else's order, a guest order and an unknown number are the same `404`.
@@ -370,8 +378,8 @@ Orders placed before the payments app existed get their payment from a data migr
   already being handled, please contact us.`); somebody else's order is a `404`. Two clicks at once cancel it once.
   Shares the `order` throttle scope with placing orders.
 - `GET /orders/track/?order_id=GC-…&phone_number=+880…` (**public**, no token needed; a stale token is ignored) →
-  `data: Order summary` + `subtotal, delivery_charge, payment, history`, and **nothing about who the order is for or
-  where it goes** (no name, e-mail, phone or address): an order number is easy to guess, the phone number is the only
+  `data: Order summary` + `subtotal, delivery_charge, discount_amount, coupon_code, payment, history`, and **nothing
+  about who the order is for or where it goes** (no name, e-mail, phone or address): an order number is easy to guess, the phone number is the only
   secret. A wrong number and a wrong phone number are the same `404` (`No order matches these details.`), the number
   may be typed in any case, missing or malformed input is a `400`. Throttled per client IP (scope `order_track`,
   `THROTTLE_ORDER_TRACK`, default `30/hour`); wrong guesses count, and past the limit even a right answer waits (`429`).
@@ -464,3 +472,32 @@ app (`apps/siteconfig`) never imports the catalog, so a template base can take i
   same for a new address, one already on the list and one in another case: the form must not tell a stranger whether an
   address is listed. An address the staff switched off is switched on again. Throttle scope `newsletter`, **10/hour per IP**.
   There is no e-mail sending yet, so no unsubscribe link either; the staff switch an address off in the admin.
+
+## 10. Coupons (public)  *(live)*
+
+A promo code, created and edited in the Django admin under **Coupons** — percentage or fixed-amount off, an optional
+minimum order amount and a cap on the discount, an optional total-use and per-customer-use limit, a validity window
+and a manual on/off switch. Used at checkout in either or both of these ways:
+
+- `POST /coupons/validate/` `{code, subtotal, phone_number?}` → `200`, `data: {discount_amount, total}` (`total =
+  subtotal - discount_amount`). Previews the discount **before** the order is placed (the cart/checkout page's
+  promo-code field): `subtotal` is only what the page already shows, and does not count as a use. `phone_number` is
+  optional; give it to also check the per-customer limit before the customer fills in the rest of the form. A `400`
+  names the one reason the code can not be used right now (see below); this call is not required — `POST /orders/`
+  (section 6) accepts `coupon_code` directly and validates it itself. Public, no token needed. Throttle scope
+  `coupon`, `THROTTLE_COUPON`, default **30/hour per client IP**.
+- On `POST /orders/`, `coupon_code` is redeemed against the **server's own** subtotal (never anything the client
+  computed) inside the same transaction as the order: a bad code adds one more sentence to that endpoint's unified
+  `errors` list, and nothing is written. A code is looked up case- and whitespace-insensitively (stored upper case).
+  A successful order snapshots `discount_amount` and the coupon it used; a **cancelled** order gives its use back
+  (section 6), so retrying is never blocked by a cancelled attempt.
+
+**Why a code is refused** (one sentence, the same wherever it is checked): the code does not exist; the coupon is
+switched off (`is_active=false`); it is not active yet or has expired (`valid_from`/`valid_until`); the subtotal is
+below `min_order_amount`; it has no total uses left (`max_redemptions`); or this phone number has already used it as
+many times as `max_redemptions_per_customer` allows (a cancelled order's use does not count). A guest is identified
+for the per-customer limit by `phone_number` alone (always present at checkout; `email` is optional, see section 6).
+
+**The discount.** A percentage or a fixed amount off the subtotal (the same rule catalog discounts use, section 5),
+then capped by `max_discount_amount` if one is set, and never more than the subtotal itself (an order is never
+negative). It applies on top of whatever the lines already cost, including any product-level discount.

@@ -45,6 +45,7 @@ def test_placing_an_order_documents_the_body_and_the_created_response(schema):
         "shipping_address",
         "payment_type",
         "items",
+        "coupon_code",
     }
     assert set(request["required"]) == {"name", "phone_number", "shipping_type", "shipping_address", "items"}
     assert component(schema, "PaymentTypeEnum")["enum"] == ["cash", "cod"]
@@ -57,7 +58,7 @@ def test_placing_an_order_documents_the_body_and_the_created_response(schema):
     body = post["responses"]["201"]["content"]["application/json"]["schema"]
     assert body["required"] == ["success", "message", "data"]
     assert set(component(schema, "OrderPlaced")["properties"]) == {
-        "order_id", "status", "created_at", "subtotal", "delivery_charge", "total"
+        "order_id", "status", "created_at", "subtotal", "delivery_charge", "discount_amount", "coupon_code", "total"
     }
     assert component(schema, "OrderPlaced")["properties"]["order_id"]["type"] == "string"
     assert component(schema, "OrderPlaced")["properties"]["total"]["type"] == "number"  # a number, not a string
@@ -95,7 +96,10 @@ def test_the_order_shapes_are_documented(schema):
     assert set(summary) == {"order_id", "status", "status_display", "created_at", "total", "items_count", "items"}
     assert summary["total"]["type"] == "number" and summary["items_count"]["type"] == "integer"
     detail = component(schema, "OrderDetail")["properties"]
-    assert {"name", "email", "phone_number", "shipping_address", "subtotal", "delivery_charge", "payment", "history", "can_cancel"} <= set(detail)
+    assert {
+        "name", "email", "phone_number", "shipping_address", "subtotal", "delivery_charge",
+        "discount_amount", "coupon_code", "payment", "history", "can_cancel",
+    } <= set(detail)
     assert detail["can_cancel"]["type"] == "boolean"
     tracking = component(schema, "OrderTracking")["properties"]
     assert not {"name", "email", "phone_number", "shipping_address", "can_cancel"} & set(tracking)  # nothing about who or where
