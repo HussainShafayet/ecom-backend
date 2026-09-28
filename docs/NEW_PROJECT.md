@@ -71,3 +71,8 @@ git remote add template <url-of-this-repo>
 git fetch template --tags
 git cherry-pick <commit>          # pick the fixes/features you want; check tags with `git tag -l "template-*"`
 ```
+
+`.github/workflows/ci.yml` and `scripts/backup.sh` (step 18) are generic — nothing GoCart-specific in either —
+but postdate `template-base-v1`, so a project cloned from that tag won't have them yet. Worth cherry-picking:
+the workflow needs no changes beyond the PostgreSQL service credentials matching `.env.example`, and the backup
+script only reads `DATABASE_URL`/`BACKUP_DIR`/`BACKUP_KEEP_DAYS`.

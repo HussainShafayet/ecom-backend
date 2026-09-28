@@ -32,11 +32,15 @@ pytest                                   # every step must end green
 python manage.py spectacular --file openapi.yaml --validate --fail-on-warn   # commit the result: a test compares it
 python scripts/e2e_smoke.py              # a whole customer visit against the RUNNING dev server (dev DB only)
 python manage.py setup_roles             # create/update the Catalog Manager & Order Manager groups (safe in prod)
+scripts/backup.sh                        # back up the database + media (cron; see README > Backups)
 ```
+
+Every push/PR to `main` runs `pytest` + schema validation in GitHub Actions (`.github/workflows/ci.yml`); keep it green.
 
 ## Structure
 
-`config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` · `scripts/` ·
+`config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` ·
+`scripts/` (`e2e_smoke.py`, `backup.sh`) · `.github/workflows/ci.yml` ·
 `apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews,notifications,coupons,dashboard}` (built step by step) ·
 `docs/API_CONTRACT.md` · `docs/ROADMAP.md` (what's built vs. still missing, priority order) · `openapi.yaml`
 
@@ -93,6 +97,9 @@ schema together, and never diverge from what the frontend calls without the user
   relying on Django's default `has_view_permission` (a superuser bypasses every check; nobody else has the
   permission). `DashboardReport` is a `managed=False` marker model with no table, existing only to give the admin
   something to register a menu entry on.
+- Error tracking: `SENTRY_DSN` is optional (empty = off, the default everywhere but a real deployment) —
+  `config/settings/base.py` calls `sentry_sdk.init(send_default_pii=False)` only when it's set, so no phone
+  number, e-mail, IP or cookie ever leaves in a report. Unlike `OTP_BACKEND`, prod does not require it.
 - Reviews: written only through `reviews.services.create_review()` / `update_review()` (needs a DELIVERED order of the
   customer containing the product; one per customer and product). The product's `total_reviews` / `avg_rating` are
   derived data: `refresh_product_rating()` recounts them from the approved reviews (locking the product row first),
