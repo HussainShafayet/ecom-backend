@@ -37,7 +37,7 @@ python manage.py setup_roles             # create/update the Catalog Manager & O
 ## Structure
 
 `config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` · `scripts/` ·
-`apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews}` (built step by step) ·
+`apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews,notifications}` (built step by step) ·
 `docs/API_CONTRACT.md` · `docs/ROADMAP.md` (what's built vs. still missing, priority order) · `openapi.yaml`
 
 ## API contract
@@ -65,6 +65,18 @@ schema together, and never diverge from what the frontend calls without the user
   the `orders.signals` (`order_placed`, `order_status_changed`, sent with `send()` inside the order's transaction so a
   failure rolls both back). `orders` never imports `payments`. `order_placed` receivers run before the order number
   exists and must not use it (do e-mail/SMS in `transaction.on_commit`).
+- Notifications: `apps/notifications` sends the customer an SMS (and e-mail, if given) when an order is placed and
+  when its status becomes confirmed/shipped/cancelled/refunded (delivered is e-mail-only; paid/returned stay
+  silent) — each event has its own on/off switch in `NotificationSettings` (one admin row, superuser-only, like
+  `SiteSettings`), checked in `apps/notifications/services.py` before composing the message. Its `apps.py` connects
+  to the same `orders.signals` as payments, but unlike payments' receivers, **both** `on_order_placed` and
+  `on_order_status_changed` always defer the actual send to `transaction.on_commit` — `order_placed`'s order has no
+  number yet, and even `order_status_changed` must not hold its row lock open across what would be a network call,
+  nor let a "sent" message survive a later rollback of the same transaction. A delivery failure is only logged,
+  never raised: an order must never fail because a notification could not go out. Pluggable like OTP
+  (`NOTIFICATION_BACKEND`, dotted path; `ConsoleNotificationBackend` logs to the console) — but unlike
+  `OTP_BACKEND`, `prod.py` does **not** require a real class here, since no notification is safety/security-critical
+  the way OTP delivery is.
 - Reviews: written only through `reviews.services.create_review()` / `update_review()` (needs a DELIVERED order of the
   customer containing the product; one per customer and product). The product's `total_reviews` / `avg_rating` are
   derived data: `refresh_product_rating()` recounts them from the approved reviews (locking the product row first),

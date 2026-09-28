@@ -37,6 +37,9 @@ if OTP_BACKEND.strip().rsplit(".", 1)[-1] == "BrowserOTPBackend":
         "and is not allowed in production. Point OTP_BACKEND at a real SMS/email delivery class."
     )
 
+# NOTIFICATION_BACKEND has no override here on purpose: unlike OTP_BACKEND above, an order notification never
+# blocks anything, so this inherits base.py's console default until a real SMS/e-mail provider is chosen.
+
 # How many reverse proxies sit in front of Django (none = 0, nginx = 1, a CDN in front of nginx = 2). No default on
 # purpose: 0 behind a proxy would throttle every customer as one address (the proxy's), and a number that is too
 # high lets a client choose its own address with an X-Forwarded-For header and dodge every throttle.

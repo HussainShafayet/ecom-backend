@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.orders",
     "apps.payments",
     "apps.reviews",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [
@@ -183,6 +184,16 @@ OTP_MAX_RESENDS = env.int("OTP_MAX_RESENDS", default=3)
 OTP_MAX_REQUESTS_PER_TARGET_PER_HOUR = env.int("OTP_MAX_REQUESTS_PER_TARGET_PER_HOUR", default=5)
 # After verifying a new phone/email with an OTP the user has this long to save it on the profile.
 PROFILE_VERIFICATION_WINDOW_SECONDS = env.int("PROFILE_VERIFICATION_WINDOW_SECONDS", default=900)
+
+# --- order notifications (SMS/e-mail on placed/confirmed/shipped/delivered/cancelled/refunded) --------
+# Delivery is pluggable, like OTP: a class with send(target=, message=, event=). Default backend logs to
+# the console. Unlike OTP_BACKEND, prod.py deliberately does NOT require a real class here: a notification
+# is a courtesy (the order is fully valid whether or not it goes out), so it's fine for a deployment to keep
+# printing to the log until a real SMS/e-mail provider is chosen. Compare OTP_BACKEND, which prod.py
+# requires with no default, because OTP delivery blocks sign-in.
+NOTIFICATION_BACKEND = env(
+    "NOTIFICATION_BACKEND", default="apps.notifications.backends.ConsoleNotificationBackend"
+)
 
 # --- shop ---------------------------------------------------------------------------------------------
 MAX_ADDRESSES_PER_USER = env.int("MAX_ADDRESSES_PER_USER", default=20)
