@@ -1,0 +1,109 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; Dashboard
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+
+  <ul class="object-tools">
+    {% for value, label in periods %}
+      <li><a href="?period={{ value }}"{% if value == period %} class="active" style="text-decoration: underline;"{% endif %}>{{ label }}</a></li>
+    {% endfor %}
+  </ul>
+
+  <div class="module">
+    <h2>Revenue</h2>
+    <table>
+      <tr><th>Today</th><th>This week</th><th>This month</th><th>All time</th></tr>
+      <tr>
+        <td>{{ revenue.today }}</td>
+        <td>{{ revenue.week }}</td>
+        <td>{{ revenue.month }}</td>
+        <td>{{ revenue.all }}</td>
+      </tr>
+    </table>
+    <p class="help">Sum of paid payments (cash collected on delivery), bucketed by when each was paid. A later refund
+      drops back out of the figure it once counted toward.</p>
+  </div>
+
+  <div class="module">
+    <h2>Orders right now, by status</h2>
+    <table>
+      <thead><tr>{% for row in status_counts %}<th>{{ row.label }}</th>{% endfor %}</tr></thead>
+      <tbody><tr>{% for row in status_counts %}<td>{{ row.count }}</td>{% endfor %}</tr></tbody>
+    </table>
+  </div>
+
+  <div class="module">
+    <h2>Top products &mdash; {{ period_label|lower }}</h2>
+    {% if top_products %}
+    <table>
+      <thead><tr><th>Product</th><th>Units sold</th><th>Revenue</th></tr></thead>
+      <tbody>
+        {% for row in top_products %}
+        <tr>
+          <td><a href="{% url 'admin:catalog_product_change' row.product.pk %}">{{ row.product.name }}</a></td>
+          <td>{{ row.units }}</td>
+          <td>{{ row.revenue }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No paid orders {{ period_label|lower }}.</p>
+    {% endif %}
+  </div>
+
+  <div class="module">
+    <h2>Low stock (&le; {{ low_stock_threshold }} units)</h2>
+    {% if low_stock %}
+    <table>
+      <thead><tr><th>Product</th><th>Variant</th><th>Stock</th></tr></thead>
+      <tbody>
+        {% for variant in low_stock %}
+        <tr>
+          <td><a href="{% url 'admin:catalog_product_change' variant.product_id %}">{{ variant.product.name }}</a></td>
+          <td>{{ variant.color|default:"" }} {{ variant.size|default:"" }}</td>
+          <td>{{ variant.stock_quantity }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Nothing is low on stock.</p>
+    {% endif %}
+  </div>
+
+  <div class="module">
+    <h2>Coupons &mdash; {{ period_label|lower }}</h2>
+    <p>{{ coupons.redemptions }} redemption{{ coupons.redemptions|pluralize }}.</p>
+    {% if coupons.top_coupons %}
+    <table>
+      <thead><tr><th>Code</th><th>Times used (all time)</th></tr></thead>
+      <tbody>
+        {% for coupon in coupons.top_coupons %}
+        <tr>
+          <td><a href="{% url 'admin:coupons_coupon_change' coupon.pk %}">{{ coupon.code }}</a></td>
+          <td>{{ coupon.times_used }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+
+  <div class="module">
+    <h2>New customers &mdash; {{ period_label|lower }}</h2>
+    <p>{{ new_customers }} registered account{{ new_customers|pluralize }}.</p>
+    <p class="help">Counts registrations only &mdash; a guest checkout never creates an account, so this is blind to
+      guest order volume.</p>
+  </div>
+
+</div>
+{% endblock %}

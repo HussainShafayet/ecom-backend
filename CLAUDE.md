@@ -37,7 +37,7 @@ python manage.py setup_roles             # create/update the Catalog Manager & O
 ## Structure
 
 `config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` · `scripts/` ·
-`apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews,notifications,coupons}` (built step by step) ·
+`apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews,notifications,coupons,dashboard}` (built step by step) ·
 `docs/API_CONTRACT.md` · `docs/ROADMAP.md` (what's built vs. still missing, priority order) · `openapi.yaml`
 
 ## API contract
@@ -85,6 +85,14 @@ schema together, and never diverge from what the frontend calls without the user
   who cancels and retries is not blocked by their own cancelled attempt. `POST /coupons/validate/` previews the
   discount (guest-writable, `ScopedRateThrottle` scope `coupon`) but is not required — `POST /orders/` redeems a
   `coupon_code` on its own.
+- Dashboard: `apps/dashboard` is Django-admin-only (Admin > Dashboard) — no DRF views, no API, no frontend change,
+  since `../ecom` has no staff UI to call one from. `services.py` holds every aggregation as a plain read-only
+  query; revenue is defined as the sum of `Payment.amount` where `status == PAID`, bucketed by `paid_at` (not
+  `Order.created_at`) — self-correcting, so a later refund drops back out of whatever period it once counted
+  toward. Owner-only like `SiteSettings`/`NotificationSettings`: never added to either Group in `setup_roles.py`,
+  relying on Django's default `has_view_permission` (a superuser bypasses every check; nobody else has the
+  permission). `DashboardReport` is a `managed=False` marker model with no table, existing only to give the admin
+  something to register a menu entry on.
 - Reviews: written only through `reviews.services.create_review()` / `update_review()` (needs a DELIVERED order of the
   customer containing the product; one per customer and product). The product's `total_reviews` / `avg_rating` are
   derived data: `refresh_product_rating()` recounts them from the approved reviews (locking the product row first),

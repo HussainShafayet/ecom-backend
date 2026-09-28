@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "apps.reviews",
     "apps.notifications",
     "apps.coupons",
+    "apps.dashboard",
 ]
 
 MIDDLEWARE = [
@@ -196,6 +197,11 @@ PROFILE_VERIFICATION_WINDOW_SECONDS = env.int("PROFILE_VERIFICATION_WINDOW_SECON
 NOTIFICATION_BACKEND = env(
     "NOTIFICATION_BACKEND", default="apps.notifications.backends.ConsoleNotificationBackend"
 )
+
+# --- dashboard (admin > Dashboard, Owner-only) ---------------------------------------------------------
+# A variant at or below this many units shows on the dashboard's low-stock list. One global number for v1;
+# a per-product threshold is a clean follow-up if some products genuinely need a different one.
+LOW_STOCK_THRESHOLD = env.int("LOW_STOCK_THRESHOLD", default=5)
 
 # --- shop ---------------------------------------------------------------------------------------------
 MAX_ADDRESSES_PER_USER = env.int("MAX_ADDRESSES_PER_USER", default=20)
