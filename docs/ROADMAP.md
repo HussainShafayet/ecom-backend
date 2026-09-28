@@ -15,8 +15,8 @@ test suite.
 | # | What | Why it matters | Status |
 |---|---|---|---|
 | 1 | Site settings + static page CMS + contact form + newsletter | The shop's own identity (name, logo, contact, social links, About/Privacy/Terms, FAQ) was hardcoded in the frontend — a developer had to ship code to change a phone number. | **Done** — `apps/siteconfig` (step 13), merged. |
-| 2 | Staff roles | Every staff user had `is_staff=True` with no Groups, so anyone made staff saw and could edit everything (orders, payments, customers) just to fix a product listing. | **In progress** — step 14. |
-| 3 | Order notifications (SMS/e-mail) | A customer places an order and hears nothing again until they check the site themselves — no "confirmed", "shipped", "delivered" message. | Not started. |
+| 2 | Staff roles | Every staff user had `is_staff=True` with no Groups, so anyone made staff saw and could edit everything (orders, payments, customers) just to fix a product listing. | **Done** — `apps/accounts/management/commands/setup_roles.py` (step 14), merged. |
+| 3 | Order notifications (SMS/e-mail) | A customer places an order and hears nothing again until they check the site themselves — no "confirmed", "shipped", "delivered" message. | **Done** — `apps/notifications` (step 15), console/log backend only; a real SMS/e-mail provider is not wired up yet. Each event has its own on/off switch (admin > Notifications). |
 | 4 | Coupon / promo codes | Almost every shop needs these for marketing. | Not started. |
 | 5 | Admin dashboard / reports | Today the admin is just Django's model list pages — no at-a-glance revenue, order count, low-stock or top-product view. | Not started. |
 | 6 | Courier integration (Pathao/Steadfast/RedX) + tracking numbers | Needed for a real Bangladesh COD shop; right now delivery is entirely manual. | Not started. |
@@ -28,7 +28,23 @@ test suite.
 Customer-initiated return/refund requests, invoice/receipt printing, low-stock alerts + stock history, related /
 recently-viewed / back-in-stock products, SEO (page titles, meta, sitemap), product CSV import/export, newsletter
 sending (subscribers are already collected — see item 1), abandoned-cart recovery, district-level delivery charges,
-VAT handling.
+VAT handling. A persisted `NotificationLog` (delivery attempts/failures, for staff visibility) once a real SMS/
+e-mail provider is chosen and failures start mattering operationally (see item 3).
+
+## A much bigger, separate idea: SaaS pricing tiers (not started, not scoped)
+
+Raised 2026-09-28 while building item 3: GoCart is currently a reusable *template* (each client gets their own
+clone/deployment, per the backend's own docs) — this idea would turn it into an actual multi-tenant SaaS product
+sold on subscription tiers (e.g. "Normal"/"Premium"), where a shop's tier gates which features it can use. The
+first concrete case raised: which order-notification *types* a shop may enable (see item 3's `NotificationSettings`
+toggle) would depend on its plan, not be freely switchable by every shop.
+
+This is genuinely a separate, large initiative — subscription/billing, a plan model, and a feature-gating
+convention that would eventually need applying consistently across every feature, not just notifications — and
+should not be bundled into any single feature step. Deliberately **not started and not designed yet**. When it is
+picked up: item 3's per-event `NotificationSettings` toggle is exactly the mechanism a plan-tier gate would sit in
+front of (a plan would just narrow *which* toggles a shop is allowed to turn on), so today's work here is not
+wasted by waiting.
 
 ## Small frontend cleanup (offered, not yet done)
 

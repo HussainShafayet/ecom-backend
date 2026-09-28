@@ -3,16 +3,21 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from apps.accounts.otp.backends import LocMemOTPBackend
+from apps.notifications.backends import LocMemNotificationBackend
 
 
 @pytest.fixture(autouse=True)
 def _isolated_environment(settings):
-    """Every test: codes go to an in-memory outbox (never the console) and throttle counters start empty."""
+    """Every test: codes/notifications go to an in-memory outbox (never the console) and throttle counters
+    start empty."""
     settings.OTP_BACKEND = "apps.accounts.otp.backends.LocMemOTPBackend"
+    settings.NOTIFICATION_BACKEND = "apps.notifications.backends.LocMemNotificationBackend"
     LocMemOTPBackend.outbox.clear()
+    LocMemNotificationBackend.outbox.clear()
     cache.clear()
     yield
     LocMemOTPBackend.outbox.clear()
+    LocMemNotificationBackend.outbox.clear()
     cache.clear()
 
 
@@ -31,3 +36,9 @@ def api_client():
 def otp_outbox():
     """The list of SentOTP(target, code, purpose) 'delivered' so far in this test."""
     return LocMemOTPBackend.outbox
+
+
+@pytest.fixture
+def notification_outbox():
+    """The list of SentNotification(target, message, event) 'delivered' so far in this test."""
+    return LocMemNotificationBackend.outbox

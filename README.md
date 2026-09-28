@@ -157,6 +157,19 @@ Every order also has a **payment** (cash on delivery: pending when placed, paid 
 paid, cancelled or refunded when the order is). Staff see them, read-only, under **Payments**; move the order and the
 payment follows.
 
+## Order notifications (SMS/e-mail)
+
+The customer gets a message when their order is placed, and when staff move it to confirmed/shipped/cancelled/
+refunded (phone + e-mail, if one was given); delivered is e-mail only — by then the customer already has the
+package, so the lower-value channel is skipped. Paid and returned stay silent (for cash on delivery, "paid" and
+"delivered" are usually the same moment, and "returned" is something the customer already witnessed). Any one of
+these can be switched off in the admin under **Notifications > Notification settings** (one row, all on by
+default) — e.g. turn off "confirmed" if staff stop doing verification calls, to save on SMS cost. Delivery is
+pluggable like OTP: `NOTIFICATION_BACKEND` (dotted path to a class with `send(target=, message=, event=)`); the
+default just logs to the console — no real SMS/e-mail provider is wired up yet. Unlike `OTP_BACKEND`, production
+does **not** require a real class here: a notification is a courtesy, so a delivery failure is only logged, never
+allowed to block the order or the status change. See `docs/ROADMAP.md` for what's still ahead.
+
 ## The shop's own content (staff)
 
 Everything the storefront shows that is not a product is set in the Django admin under **Site**, nothing is written into
