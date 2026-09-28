@@ -180,6 +180,16 @@ default just logs to the console — no real SMS/e-mail provider is wired up yet
 does **not** require a real class here: a notification is a courtesy, so a delivery failure is only logged, never
 allowed to block the order or the status change. See `docs/ROADMAP.md` for what's still ahead.
 
+## Admin dashboard (staff, Owner-only)
+
+**Admin > Dashboard** gives an at-a-glance view: revenue (today/this week/this month/all-time), how many orders are
+in each status right now, the best-selling products and how much they made, coupon redemptions, new customer
+registrations, and which product variants are low on stock (`LOW_STOCK_THRESHOLD`, default 5 units). Revenue counts
+a payment the moment it turns `paid` (cash collected on delivery), not when the order was placed, and a later
+refund removes it again — the figure always reflects money the shop currently holds, not a frozen historical total.
+Superuser-only, like Site settings/Notification settings: neither staff Group is granted it in `setup_roles.py`.
+Nothing here is an API — it's a page in the Django admin, computed on request with no caching or background job.
+
 ## The shop's own content (staff)
 
 Everything the storefront shows that is not a product is set in the Django admin under **Site**, nothing is written into
