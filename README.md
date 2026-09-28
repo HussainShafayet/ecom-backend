@@ -121,6 +121,7 @@ python manage.py spectacular --file openapi.yaml --validate --fail-on-warn   # r
 python scripts/e2e_smoke.py                                                  # a whole customer visit against the running dev server
 python manage.py check --deploy --settings=config.settings.prod              # production readiness (needs prod env vars)
 python manage.py seed_catalog && python manage.py seed_content && python manage.py seed_site   # demo products, sliders and banners, and a sample shop identity, pages and FAQ (dev only)
+python manage.py setup_roles                                                                   # create/update the Catalog Manager & Order Manager groups (safe in prod too)
 ```
 
 ### Smoke test: the whole shop against a running server
@@ -167,6 +168,21 @@ scripts when saved; give a page a footer group and it appears in the footer; unt
 database with a sample identity, four pages and a FAQ (it leaves whatever the shop already has alone). The public reads
 are `GET /site/`, `/site/pages/<slug>/`, `/site/faq/`; the contact form and the newsletter box are `POST /site/contact/`
 (`THROTTLE_CONTACT`) and `POST /site/newsletter/` (`THROTTLE_NEWSLETTER`). Nothing is e-mailed yet: staff read messages in the admin.
+
+## Staff roles (staff)
+
+Every staff user needs `is_staff=True`, but what they can *do* in the admin comes from Django Groups, not that flag
+alone — with no Group, a staff user sees nothing (except a superuser, who sees everything regardless). Two Groups:
+**Catalog Manager** (Category/Brand/Tag/Color/Size/Product and their variants/media, the CMS banners under **Site
+content**, and **Static pages**/**FAQ**) and **Order Manager** (change an order's status, read-only Payments,
+moderate reviews, **Contact messages**, and read-only **Users** for looking a customer up). Neither can touch the
+shop's own identity (**Site settings**, **Social links**), **Newsletter subscribers**, **Delivery charges**, or a
+user's `is_staff`/groups/password — those stay for the **Owner**, which is simply `is_superuser=True`, never a
+Group. `python manage.py setup_roles` creates/updates both Groups to exactly the permissions above and is safe to
+rerun in every environment, including production — unlike the `seed_*` commands above it, it writes real
+permissions, not sample data. To make someone a Catalog Manager or Order Manager: open their user in **Users**,
+tick **Staff status**, and add them to the Group, in the existing **Permissions** fieldset. See `docs/ROADMAP.md`
+for what's still missing (a Delivery-agent role is deferred until courier integration lands).
 
 ## Production notes
 
