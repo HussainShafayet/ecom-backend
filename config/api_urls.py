@@ -15,6 +15,7 @@ urlpatterns = [
     path("", include("apps.orders.urls")),  # /orders/, /content/checkout/
     path("", include("apps.reviews.urls")),  # /products/reviews/
     path("", include("apps.siteconfig.urls")),  # /site/…
+    path("", include("apps.coupons.urls")),  # /coupons/validate/
     # Keep last: unknown API paths answer with the JSON error envelope (also when DEBUG=True).
     re_path(r"^.*$", ApiNotFoundView.as_view()),
 ]

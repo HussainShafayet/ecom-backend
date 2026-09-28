@@ -4,6 +4,7 @@ from django.db.models import F, Q
 
 from apps.addresses.models import Address
 from apps.catalog.models import Product, ProductVariant, Timestamped, money_field
+from apps.core.money import ZERO
 
 
 class DeliveryCharge(Timestamped):
@@ -72,6 +73,11 @@ class Order(Timestamped):
 
     payment_method = models.CharField(max_length=10, choices=PaymentMethod.choices, default=PaymentMethod.COD)
 
+    # The coupon used, if any (kept even if the coupon is later deleted, so the order still shows what it saved).
+    coupon = models.ForeignKey(
+        "coupons.Coupon", null=True, blank=True, on_delete=models.SET_NULL, related_name="orders"
+    )
+    discount_amount = money_field(default=ZERO, help_text="What the coupon took off. 0 when there was none.")
     subtotal = money_field()
     delivery_charge = money_field()
     total = money_field()
@@ -86,8 +92,11 @@ class Order(Timestamped):
             models.CheckConstraint(condition=Q(subtotal__gte=0), name="order_subtotal_gte_0"),
             models.CheckConstraint(condition=Q(delivery_charge__gte=0), name="order_delivery_charge_gte_0"),
             models.CheckConstraint(condition=Q(total__gte=0), name="order_total_gte_0"),
+            models.CheckConstraint(condition=Q(discount_amount__gte=0), name="order_discount_amount_gte_0"),
+            models.CheckConstraint(condition=Q(discount_amount__lte=F("subtotal")), name="order_discount_amount_lte_subtotal"),
             models.CheckConstraint(
-                condition=Q(total=F("subtotal") + F("delivery_charge")), name="order_total_is_subtotal_plus_delivery"
+                condition=Q(total=F("subtotal") + F("delivery_charge") - F("discount_amount")),
+                name="order_total_is_subtotal_plus_delivery_minus_discount",
             ),
         ]
 

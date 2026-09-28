@@ -50,6 +50,8 @@ def test_a_guest_places_an_order(api_client):
         "created_at": body["data"]["created_at"],
         "subtotal": 1000.0,
         "delivery_charge": 60.0,
+        "discount_amount": 0.0,
+        "coupon_code": "",
         "total": 1060.0,
     }
     order = Order.objects.get()

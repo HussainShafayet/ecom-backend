@@ -7,14 +7,18 @@
      ones nobody else can change before we commit. Every problem is collected into ONE error, nothing is written;
   3. prices come from the database (`pricing.variant_prices`), the delivery charge from `DeliveryCharge`. Whatever
      prices and totals the client sent are never read;
-  4. write the order, its lines (snapshots) and its first history row, take the stock, count the sale on each
+  4. a `coupon_code`, if any, is redeemed against the real subtotal above (`coupons.services.apply_coupon_to_order`,
+     locking the coupon row) — again never against whatever discount the client showed;
+  5. write the order, its lines (snapshots) and its first history row, take the stock, count the sale on each
      product, empty the customer's cart lines;
-  5. take the order number LAST: the per-day counter row stays locked until the commit, so the less that happens
+  6. take the order number LAST: the per-day counter row stays locked until the commit, so the less that happens
      after it the better.
-Lock order everywhere is variants (pk order), then products (pk order), then the day counter.
+Lock order everywhere is variants (pk order), then the coupon, then products (pk order), then the day counter —
+`change_status`'s cancellation path (below) releases the coupon before it restocks, for the same reason.
 
 `change_status` is the only place a status changes: it checks `state.py`, puts the goods back on the shelf when the
-transition says so, and writes the `OrderStatusHistory` row.
+transition says so, gives back the order's coupon use (if any) on a move to `CANCELLED` — so a customer who
+cancels and retries is not blocked by their own cancelled attempt — and writes the `OrderStatusHistory` row.
 
 Both announce themselves through `signals.py` (inside their transaction) so the payments app can follow along.
 """
@@ -34,6 +38,7 @@ from apps.catalog.models import Product, ProductVariant
 from apps.catalog.pricing import variant_prices
 from apps.catalog.queries import main_images
 from apps.core.money import ZERO, quantize_money
+from apps.coupons import services as coupon_services
 
 from . import hooks, signals, state
 from .models import DeliveryCharge, Order, OrderItem, OrderSequence, OrderStatusHistory
@@ -178,6 +183,12 @@ def place_order(user=None, data=None):
                 )
             )
 
+        coupon, discount_amount = None, ZERO
+        if data.get("coupon_code"):
+            coupon, discount_amount = coupon_services.apply_coupon_to_order(
+                data["coupon_code"], subtotal, data["phone_number"]
+            )
+
         order = Order.objects.create(
             user=user,
             status=Order.Status.PENDING,
@@ -191,9 +202,11 @@ def place_order(user=None, data=None):
             shipping_thana=data.get("shipping_thana", ""),
             shipping_address=data["shipping_address"],
             payment_method=PAYMENT_TYPES[data.get("payment_type", "cash")],
+            coupon=coupon,
+            discount_amount=discount_amount,
             subtotal=subtotal,
             delivery_charge=delivery_charge,
-            total=subtotal + delivery_charge,
+            total=subtotal + delivery_charge - discount_amount,
         )
         for row in rows:
             row.order = order
@@ -219,12 +232,15 @@ def place_order(user=None, data=None):
 def change_status(order, new_status, by=None, note=""):
     """Move `order` to `new_status` if `state.py` allows it, else raise `InvalidTransition`. The only place a status
     changes. Locks the order row (two staff members can not both cancel it and restock twice), puts the goods back
-    when the transition says so, and writes the history row. `by` is the staff user, if any. Returns the order."""
+    when the transition says so, gives back a coupon's use on a move to CANCELLED, and writes the history row.
+    `by` is the staff user, if any. Returns the order."""
     with transaction.atomic():
         locked = Order.objects.select_for_update().get(pk=order.pk)
         old = locked.status
         if not state.can_transition(old, new_status):
             raise InvalidTransition(old, new_status)
+        if new_status == Order.Status.CANCELLED and locked.coupon_id:
+            coupon_services.release_coupon_usage(locked.coupon_id)
         if state.restocks(old, new_status):
             _restock(locked)
         locked.status = new_status
@@ -259,13 +275,15 @@ CANCEL_REFUSED = (
 
 def customer_orders(user):
     """The signed-in customer's orders, newest first (a queryset, so it paginates)."""
-    return Order.objects.filter(user=user).prefetch_related("items")
+    return Order.objects.filter(user=user).select_related("coupon").prefetch_related("items")
 
 
 def customer_order(user, number):
     """One of the customer's own orders by its number, or a 404. An order of somebody else, a guest order and a
     number that does not exist all look the same."""
-    order = Order.objects.filter(user=user, number=number).prefetch_related("items", "history").first()
+    order = (
+        Order.objects.filter(user=user, number=number).select_related("coupon").prefetch_related("items", "history").first()
+    )
     if order is None:
         raise NotFound("Order not found.")
     return order
@@ -274,7 +292,12 @@ def customer_order(user, number):
 def tracked_order(number, phone_number):
     """The order with this number, when `phone_number` is the one it was placed with. For a guest the pair is the key.
     Every miss is the same 404, so the answer never says which of the two was wrong."""
-    order = Order.objects.filter(number=number, phone_number=phone_number).prefetch_related("items", "history").first()
+    order = (
+        Order.objects.filter(number=number, phone_number=phone_number)
+        .select_related("coupon")
+        .prefetch_related("items", "history")
+        .first()
+    )
     if order is None:
         raise NotFound("No order matches these details.")
     return order
