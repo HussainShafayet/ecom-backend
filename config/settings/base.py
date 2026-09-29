@@ -242,6 +242,9 @@ SPECTACULAR_SETTINGS = {
 # Tokens travel in the Authorization header (not cookies), so credentials are not needed.
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 CORS_ALLOW_HEADERS = list(default_headers)
+# A page on another origin (the storefront) can only READ the response headers listed here. Retry-After (on a 429) says how long
+# to wait; without it the storefront has to parse the seconds out of DRF's sentence.
+CORS_EXPOSE_HEADERS = ["Retry-After"]
 CORS_ALLOW_CREDENTIALS = False
 CORS_URLS_REGEX = r"^/api/.*$"
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])

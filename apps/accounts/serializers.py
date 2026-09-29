@@ -69,7 +69,13 @@ class LogoutSerializer(serializers.Serializer):
 
 
 # --- response shapes (documentation only; views return plain dicts) ---------------------------------
-class OTPSentSerializer(serializers.Serializer):
+class OTPTimingSerializer(serializers.Serializer):
+    resend_after = serializers.IntegerField(help_text="Seconds before another code may be asked for (the cooldown).")
+    expires_in = serializers.IntegerField(help_text="Seconds a code stays valid.")
+    length = serializers.IntegerField(help_text="Digits in a code.")
+
+
+class OTPSentSerializer(OTPTimingSerializer):
     token = serializers.CharField(help_text="Opaque URL-safe token; send it back with the OTP.")
 
 

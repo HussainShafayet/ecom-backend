@@ -56,10 +56,10 @@ A page past the end returns 200 with `results: []` and `next: null`.
 
 | Endpoint | Body | `data` |
 |---|---|---|
-| `POST /accounts/register/` | `{name, phone_number, email?}` | `{token}`, message `OTP sent to +88017****5678.` Creates an unverified user (or re-uses one that never verified); `400` if the phone is already verified or the email is taken. `token` is an opaque **URL-safe** string (the frontend puts it in the path `/verify-otp/:token`). |
-| `POST /accounts/login/` | `{phone_number, expiresInMins?}` (extra key ignored) | `{token}`. `400` if the number is unknown, not verified yet, or the account is disabled. |
+| `POST /accounts/register/` | `{name, phone_number, email?}` | `{token, resend_after, expires_in, length}` (see *OTP timing* below), message `OTP sent to +88017****5678.` Creates an unverified user (or re-uses one that never verified); `400` if the phone is already verified or the email is taken. `token` is an opaque **URL-safe** string (the frontend puts it in the path `/verify-otp/:token`). |
+| `POST /accounts/login/` | `{phone_number, expiresInMins?}` (extra key ignored) | `{token, resend_after, expires_in, length}`. `400` if the number is unknown, not verified yet, or the account is disabled. |
 | `POST /accounts/verify-otp/` | `{token, otp, cart:[{product_id, quantity, variant_id?}], favorite:[{product_id}]}` (**key is `favorite`**) | `{tokens:{access, refresh}}`. Marks the phone verified. `cart`/`favorite` are optional lists of objects (max 100 each) handed to the shop apps through the `guest_data_received` signal; malformed entries are the receivers' problem and never block sign-in. |
-| `POST /accounts/resend-otp/` | `{token}` | `null` (+ message). Same token, new code; also allowed after the old code expired. |
+| `POST /accounts/resend-otp/` | `{token}` | `{resend_after, expires_in, length}` (+ message). Same token, new code; also allowed after the old code expired. `429` with `Retry-After` inside the cooldown or past the hourly limit, `400` after too many resends. |
 | `POST /accounts/token/refresh/` | `{refresh, expiresInMins?}`; the `Authorization` header (a stale access token) is ignored | `{access, refresh}`. **Always returns a new `refresh`** (rotation); the old one is blacklisted, replaying it is `401`. Invalid/expired/blacklisted refresh, or a disabled/deleted user: `401` (with `WWW-Authenticate: Bearer`). |
 | `POST /accounts/logout/` | `{access?, refresh?}` (Bearer ignored) | `null`. Blacklists the refresh token. Idempotent: `200` even if it is missing, invalid or already revoked. `access` is accepted and ignored (access tokens are short-lived and stateless). |
 
@@ -71,6 +71,14 @@ e.g. `Invalid OTP. 4 attempts left.`, `This OTP has expired. Please request a ne
 A delivery failure is `503` (nothing is created). In dev the code is printed in the server log.
 
 **Dev only, never production:** with `OTP_BACKEND=apps.accounts.otp.backends.BrowserOTPBackend` the `message` of
+**OTP timing.** Every "OTP sent" answer (`register/`, `login/`, `request-otp/`) and the `resend-otp/` answer carry the numbers a client must
+not keep its own copy of: `resend_after` (seconds before another code may be asked for = `OTP_RESEND_COOLDOWN_SECONDS`), `expires_in`
+(seconds a code works = `OTP_TTL_SECONDS`) and `length` (digits = `OTP_LENGTH`). The storefront counts its Resend button down from
+`resend_after` and writes "expires in 5 minutes" from `expires_in`. A `429` (a resend inside the cooldown, more than
+`OTP_MAX_REQUESTS_PER_TARGET_PER_HOUR` codes an hour, or the per-IP `otp_send` / `otp_verify` limits) carries `Retry-After: <seconds>` (exposed to
+browsers through `CORS_EXPOSE_HEADERS`) and DRF's sentence "Request was throttled. Expected available in N seconds."; a client shows
+"try again in N seconds", never that sentence.
+
 `register/`, `login/`, `resend-otp/` and `request-otp/` also carries the code, e.g.
 `OTP sent to +88017****5678. [DEV] Your code is 123456.` (or `A new OTP has been sent. [DEV] Your code is 123456.`),
 so the frontend shows it without any change. `data` and every other message stay as documented. That backend refuses to
@@ -83,7 +91,7 @@ response never contains a code. Clients must not parse or rely on this text.
 |---|---|---|
 | `GET /accounts/profile/` | | `{name, username, email, phone_number, date_of_birth, gender, profile_picture}`: `phone_number` never null; `username`/`email`/`date_of_birth`/`profile_picture` are `null` when unset; `gender` ∈ male/female/other/`""`; `profile_picture` is an absolute URL |
 | `PUT /accounts/profile/` (`PATCH` is an alias) | multipart or JSON, **partial**: send only what changed (or just `profile_picture`). Unknown/privileged keys (`is_staff`, `id`, …) are ignored | the updated profile |
-| `POST /accounts/request-otp/` | `{phone_number}` **or** `{email}` (exactly one): the NEW value | `{token}`, message `OTP sent to +88017****5678.` `400` if it is the user's current value or belongs to another account |
+| `POST /accounts/request-otp/` | `{phone_number}` **or** `{email}` (exactly one): the NEW value | `{token, resend_after, expires_in, length}`, message `OTP sent to +88017****5678.` `400` if it is the user's current value or belongs to another account |
 | `POST /accounts/verify-otp-for-profile/` | `{token, otp}` | `{field: "phone_number"\|"email", value}`. Wrong OTP = **400** (never 401). The token must belong to the caller |
 | `GET /accounts/addresses/` | | **plain array** of Address (not paginated), oldest first |
 | `POST /accounts/addresses/` | Address fields (`201`) | the created Address incl. `id` |

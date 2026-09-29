@@ -121,8 +121,9 @@ def test_the_reveal_backend_adds_the_code_to_the_message_of_all_four_endpoints(a
         assert response.json()["message"] == hint(BASE_MESSAGES[name]), name
         # the code sits in `message` only: not in `data`, not anywhere else in the body
         assert response.content.decode().count(CODE) == 1, name
-    assert set(responses["register"].json()["data"]) == {"token"}
-    assert responses["resend"].json()["data"] is None
+    # `data` is the token and the timing (see test_otp_timing), never the code; resend has no new token
+    assert set(responses["register"].json()["data"]) == {"token", "resend_after", "expires_in", "length"}
+    assert set(responses["resend"].json()["data"]) == {"resend_after", "expires_in", "length"}
     # it still logs like the console backend
     assert f"[DEV ONLY] OTP for {PHONE} (register): {CODE}" in caplog.text
 
