@@ -878,8 +878,9 @@ paths:
   /api/v1/accounts/resend-otp/:
     post:
       operationId: accounts_resend_otp_create
-      description: Same token, new code. Cooldown between sends (429) and a maximum
-        number of resends (400).
+      description: Same token, new code. Cooldown between sends (429, with `Retry-After`)
+        and a maximum number of resends (400). The answer carries the same `resend_after`
+        / `expires_in` / `length` as the first send.
       summary: Send a fresh OTP for an existing token
       tags:
       - auth
@@ -899,7 +900,6 @@ paths:
       - {}
       responses:
         '200':
-          description: A new OTP has been sent.
           content:
             application/json:
               schema:
@@ -916,8 +916,8 @@ paths:
                     type: string
                     example: OK
                   data:
-                    type: object
-                    nullable: true
+                    $ref: '#/components/schemas/OTPTiming'
+          description: ''
         4XX:
           description: Error envelope
           content:
@@ -3415,11 +3415,39 @@ components:
     OTPSent:
       type: object
       properties:
+        resend_after:
+          type: integer
+          description: Seconds before another code may be asked for (the cooldown).
+        expires_in:
+          type: integer
+          description: Seconds a code stays valid.
+        length:
+          type: integer
+          description: Digits in a code.
         token:
           type: string
           description: Opaque URL-safe token; send it back with the OTP.
       required:
+      - expires_in
+      - length
+      - resend_after
       - token
+    OTPTiming:
+      type: object
+      properties:
+        resend_after:
+          type: integer
+          description: Seconds before another code may be asked for (the cooldown).
+        expires_in:
+          type: integer
+          description: Seconds a code stays valid.
+        length:
+          type: integer
+          description: Digits in a code.
+      required:
+      - expires_in
+      - length
+      - resend_after
     OrderDetail:
       type: object
       description: One of the customer's own orders, in full.

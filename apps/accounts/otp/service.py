@@ -33,6 +33,21 @@ class IssuedOTP:
     token: str
     dev_code: str | None = field(default=None, repr=False)
 
+    @staticmethod
+    def timing():
+        """The OTP rules the client shows or waits for, so it never keeps its own copy of them (a copy drifts: the storefront
+        once waited 30 s before "Resend" while this setting was 60, and got throttled). `resend_after`: seconds before
+        another code may be asked for; `expires_in`: how long a code works; `length`: digits in a code."""
+        return {
+            "resend_after": settings.OTP_RESEND_COOLDOWN_SECONDS,
+            "expires_in": settings.OTP_TTL_SECONDS,
+            "length": settings.OTP_LENGTH,
+        }
+
+    def public_data(self):
+        """The `data` of an "OTP sent" response: the token to send back with the code, and the timing."""
+        return {"token": self.token, **self.timing()}
+
     def with_dev_hint(self, message):
         """`message`, plus the code when (and only when) it may be shown: "... [DEV] Your code is 123456."."""
         return message if self.dev_code is None else f"{message} [DEV] Your code is {self.dev_code}."

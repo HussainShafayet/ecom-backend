@@ -12,6 +12,7 @@ from .serializers import (
     LoginSerializer,
     LogoutSerializer,
     OTPSentSerializer,
+    OTPTimingSerializer,
     ProfileOTPRequestSerializer,
     ProfileOTPVerifiedSerializer,
     ProfileOTPVerifySerializer,
@@ -54,7 +55,7 @@ class RegisterView(PublicAuthView):
         serializer.is_valid(raise_exception=True)
         user, issued = services.register_user(**serializer.validated_data)
         message = issued.with_dev_hint(f"OTP sent to {mask_phone(user.phone_number)}.")
-        return api_response({"token": issued.token}, message=message)
+        return api_response(issued.public_data(), message=message)
 
 
 class LoginView(PublicAuthView):
@@ -69,7 +70,7 @@ class LoginView(PublicAuthView):
         serializer.is_valid(raise_exception=True)
         user, issued = services.start_login(**serializer.validated_data)
         message = issued.with_dev_hint(f"OTP sent to {mask_phone(user.phone_number)}.")
-        return api_response({"token": issued.token}, message=message)
+        return api_response(issued.public_data(), message=message)
 
 
 class VerifyOTPView(PublicAuthView):
@@ -96,15 +97,16 @@ class ResendOTPView(PublicAuthView):
     @extend_schema(
         tags=["auth"],
         summary="Send a fresh OTP for an existing token",
-        description="Same token, new code. Cooldown between sends (429) and a maximum number of resends (400).",
+        description="Same token, new code. Cooldown between sends (429, with `Retry-After`) and a maximum number of resends (400). "
+        "The answer carries the same `resend_after` / `expires_in` / `length` as the first send.",
         request=ResendOTPSerializer,
-        responses={200: OpenApiResponse(description="A new OTP has been sent.")},
+        responses=OTPTimingSerializer,
     )
     def post(self, request):
         serializer = ResendOTPSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         issued = services.resend_auth_otp(token=serializer.validated_data["token"])
-        return api_response(None, message=issued.with_dev_hint("A new OTP has been sent."))
+        return api_response(issued.timing(), message=issued.with_dev_hint("A new OTP has been sent."))
 
 
 class TokenRefreshView(PublicAuthView):
@@ -194,7 +196,7 @@ class ProfileOTPRequestView(ProfileOTPView):
         field, value = serializer.validated_data["field"], serializer.validated_data["value"]
         issued = profile_services.start_change_verification(user=request.user, field=field, value=value)
         masked = mask_phone(value) if field == "phone_number" else mask_email(value)
-        return api_response({"token": issued.token}, message=issued.with_dev_hint(f"OTP sent to {masked}."))
+        return api_response(issued.public_data(), message=issued.with_dev_hint(f"OTP sent to {masked}."))
 
 
 class ProfileOTPVerifyView(ProfileOTPView):
