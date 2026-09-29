@@ -36,6 +36,10 @@ def settings_form(**overrides):
         "social_links-INITIAL_FORMS": "0",
         "social_links-MIN_NUM_FORMS": "0",
         "social_links-MAX_NUM_FORMS": "1000",
+        "trust_badges-TOTAL_FORMS": "0",
+        "trust_badges-INITIAL_FORMS": "0",
+        "trust_badges-MIN_NUM_FORMS": "0",
+        "trust_badges-MAX_NUM_FORMS": "1000",
     }
     return data | overrides
 
@@ -89,6 +93,20 @@ def test_social_links_are_edited_on_the_same_page(admin_client):
     })
     assert admin_client.post(reverse("admin:siteconfig_sitesettings_change", args=[1]), form).status_code == 302
     assert SiteSettings.load().social_links.get().url == "https://instagram.com/shop"
+
+
+def test_trust_badges_are_edited_on_the_same_page(admin_client):
+    make_settings()
+    form = settings_form(**{
+        "trust_badges-TOTAL_FORMS": "1",
+        "trust_badges-0-icon": "delivery",
+        "trust_badges-0-title": "Free delivery",
+        "trust_badges-0-subtitle": "",
+        "trust_badges-0-order": "0",
+        "trust_badges-0-is_active": "on",
+    })
+    assert admin_client.post(reverse("admin:siteconfig_sitesettings_change", args=[1]), form).status_code == 302
+    assert SiteSettings.load().trust_badges.get().title == "Free delivery"
 
 
 def test_a_platform_twice_is_refused_in_the_form(admin_client):

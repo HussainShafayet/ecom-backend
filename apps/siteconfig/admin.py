@@ -5,11 +5,16 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 
-from .models import ContactMessage, FaqItem, NewsletterSubscriber, SiteSettings, SocialLink, StaticPage
+from .models import ContactMessage, FaqItem, NewsletterSubscriber, SiteSettings, SocialLink, StaticPage, TrustBadge
 
 
 class SocialLinkInline(admin.TabularInline):
     model = SocialLink
+    extra = 0
+
+
+class TrustBadgeInline(admin.TabularInline):
+    model = TrustBadge
     extra = 0
 
 
@@ -22,7 +27,7 @@ class SiteSettingsAdmin(admin.ModelAdmin):
         ("Announcement bar", {"fields": ("announcement_enabled", "announcement_text", "announcement_link")}),
         ("Contact details", {"fields": ("contact_email", "contact_phone", "contact_address", "opening_hours", "map_embed_url")}),
     )
-    inlines = (SocialLinkInline,)
+    inlines = (SocialLinkInline, TrustBadgeInline)
 
     def changelist_view(self, request, extra_context=None):
         return redirect(reverse("admin:siteconfig_sitesettings_change", args=[SiteSettings.load().pk]))

@@ -2,7 +2,7 @@
 serializers validate what a visitor sends."""
 from rest_framework import serializers
 
-from .models import ContactMessage, SocialLink, StaticPage
+from .models import ContactMessage, SocialLink, StaticPage, TrustBadge
 
 
 class AnnouncementSerializer(serializers.Serializer):
@@ -23,6 +23,12 @@ class SocialLinkSerializer(serializers.Serializer):
     url = serializers.URLField()
 
 
+class TrustBadgeSerializer(serializers.Serializer):
+    icon = serializers.ChoiceField(choices=TrustBadge.Icon.choices)
+    title = serializers.CharField()
+    subtitle = serializers.CharField(allow_blank=True)
+
+
 class FooterPageSerializer(serializers.Serializer):
     slug = serializers.CharField(help_text="Open it at /pages/<slug>.")
     title = serializers.CharField()
@@ -41,6 +47,7 @@ class SiteSerializer(serializers.Serializer):
     announcement = AnnouncementSerializer(allow_null=True, help_text="null: no bar.")
     contact = ContactDetailsSerializer()
     social_links = SocialLinkSerializer(many=True)
+    trust_badges = TrustBadgeSerializer(many=True)
     footer_pages = FooterPagesSerializer()
 
 

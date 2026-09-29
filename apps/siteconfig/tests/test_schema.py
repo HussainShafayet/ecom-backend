@@ -37,12 +37,19 @@ def test_the_reads_are_documented_as_public_envelopes(schema, path, component):
 
 def test_the_site_shape_is_documented(schema):
     components = schema["components"]["schemas"]
-    assert set(components["Site"]["properties"]) == {"name", "tagline", "logo", "announcement", "contact", "social_links", "footer_pages"}
+    assert set(components["Site"]["properties"]) == {
+        "name", "tagline", "logo", "announcement", "contact", "social_links", "trust_badges", "footer_pages",
+    }
     assert set(components["ContactDetails"]["properties"]) == {"email", "phone", "address", "opening_hours", "map_url"}
     assert set(components["FooterPages"]["properties"]) == {"company", "service", "legal"}
     assert components["SocialLink"]["properties"]["platform"]["$ref"].endswith("/PlatformEnum")
     assert set(components["PlatformEnum"]["enum"]) == {
         "facebook", "instagram", "x", "youtube", "linkedin", "tiktok", "whatsapp", "telegram",
+    }
+    assert set(components["TrustBadge"]["properties"]) == {"icon", "title", "subtitle"}
+    assert components["TrustBadge"]["properties"]["icon"]["$ref"].endswith("/IconEnum")
+    assert set(components["IconEnum"]["enum"]) == {
+        "delivery", "returns", "secure_payment", "cash_on_delivery", "support", "warranty",
     }
 
 

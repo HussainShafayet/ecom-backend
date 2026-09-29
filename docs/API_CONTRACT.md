@@ -445,6 +445,7 @@ app (`apps/siteconfig`) never imports the catalog, so a template base can take i
     "announcement": {"text": "Flash Sale!", "link": "/products/flash-sale"},
     "contact": {"email": "", "phone": "", "address": "", "opening_hours": "", "map_url": ""},
     "social_links": [{"platform": "facebook", "url": "https://..."}],
+    "trust_badges": [{"icon": "delivery", "title": "Free delivery", "subtitle": ""}],
     "footer_pages": {"company": [{"slug": "about-us", "title": "About Us"}], "service": [], "legal": []}
   }}
   ```
@@ -456,6 +457,10 @@ app (`apps/siteconfig`) never imports the catalog, so a template base can take i
     else is accepted), for an `<iframe>`.
   - `social_links` are the active ones in the admin's order. `platform` is one of `facebook, instagram, x, youtube,
     linkedin, tiktok, whatsapp, telegram`; `url` is `http(s)`.
+  - `trust_badges` are the active ones in the admin's order (a short "why buy from us" strip under the header:
+    free delivery, easy returns, ...). `icon` is one of `delivery, returns, secure_payment, cash_on_delivery,
+    support, warranty` — the frontend maps it to its own icon, no image upload involved. `subtitle` is `""` when
+    not set. No badges configured → `[]`, and the storefront draws nothing.
   - `footer_pages` are the **published** pages the admin put in a footer group, each group in the admin's order. Open a
     page at `/pages/<slug>` in the storefront.
   - A shop that has saved nothing yet still answers (`name: "My Shop"`, everything else empty). Reading never writes.
