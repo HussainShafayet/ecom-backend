@@ -3,7 +3,7 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from PIL import Image
 
-from apps.siteconfig.models import FaqItem, SiteSettings, SocialLink, StaticPage
+from apps.siteconfig.models import FaqItem, SiteSettings, SocialLink, StaticPage, TrustBadge
 
 
 def image_file(name="logo.png", size=(64, 64)):
@@ -22,6 +22,10 @@ def make_settings(**fields):
 
 def make_link(platform="facebook", url="https://www.facebook.com/shop", **kwargs):
     return SocialLink.objects.create(site=SiteSettings.load(), platform=platform, url=url, **kwargs)
+
+
+def make_badge(icon="delivery", title="Free delivery", **kwargs):
+    return TrustBadge.objects.create(site=SiteSettings.load(), icon=icon, title=title, **kwargs)
 
 
 def make_page(slug="about-us", title="About Us", body="<p>Hello</p>", **kwargs):

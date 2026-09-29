@@ -4,11 +4,11 @@ from django.test.utils import CaptureQueriesContext
 
 from apps.siteconfig.models import SiteSettings
 
-from .helpers import image_file, make_link, make_page, make_settings
+from .helpers import image_file, make_badge, make_link, make_page, make_settings
 
 pytestmark = pytest.mark.django_db
 
-SITE_KEYS = {"name", "tagline", "logo", "announcement", "contact", "social_links", "footer_pages"}
+SITE_KEYS = {"name", "tagline", "logo", "announcement", "contact", "social_links", "trust_badges", "footer_pages"}
 CONTACT_KEYS = {"email", "phone", "address", "opening_hours", "map_url"}
 URL = "/api/v1/site/"
 
@@ -36,6 +36,7 @@ def test_a_shop_that_saved_nothing_gets_the_defaults_and_nothing_is_written(api_
     data = site(api_client)
     assert data["name"] == "My Shop"
     assert data["logo"] is None and data["announcement"] is None and data["social_links"] == []
+    assert data["trust_badges"] == []
     assert data["footer_pages"] == {"company": [], "service": [], "legal": []}
     assert SiteSettings.objects.count() == 0
 
@@ -96,6 +97,22 @@ def test_social_links_are_the_active_ones_in_the_admins_order(api_client):
     ]
 
 
+# --- trust badges -------------------------------------------------------------------------------------------
+def test_trust_badges_are_the_active_ones_in_the_admins_order(api_client):
+    make_badge("returns", "Easy returns", order=1)
+    make_badge("delivery", "Free delivery", order=0)
+    make_badge("support", "Hidden", order=2, is_active=False)
+    assert site(api_client)["trust_badges"] == [
+        {"icon": "delivery", "title": "Free delivery", "subtitle": ""},
+        {"icon": "returns", "title": "Easy returns", "subtitle": ""},
+    ]
+
+
+def test_a_trust_badge_can_have_a_subtitle(api_client):
+    make_badge("secure_payment", "Secure payment", subtitle="256-bit SSL")
+    assert site(api_client)["trust_badges"] == [{"icon": "secure_payment", "title": "Secure payment", "subtitle": "256-bit SSL"}]
+
+
 # --- footer pages ------------------------------------------------------------------------------------------
 def test_footer_pages_are_grouped_published_and_ordered(api_client):
     make_page("about-us", "About Us", footer_group="company", order=1)
@@ -122,6 +139,7 @@ def test_the_answer_costs_a_fixed_number_of_queries(api_client):
     for index in range(5):
         make_link(["facebook", "instagram", "x", "youtube", "tiktok"][index], f"https://example.com/{index}")
         make_page(f"p{index}", f"P{index}", footer_group="company")
+        make_badge(["delivery", "returns", "secure_payment", "cash_on_delivery", "support"][index], f"Badge {index}")
     with CaptureQueriesContext(connection) as queries:
         assert api_client.get(URL).status_code == 200
-    assert len(queries) <= 3
+    assert len(queries) <= 4

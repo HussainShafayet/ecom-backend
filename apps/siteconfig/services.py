@@ -1,7 +1,7 @@
 """What `/site/…` answers. Reading never writes: a shop that has not saved its settings yet answers with the defaults."""
 from apps.core.utils import absolute_url
 
-from .models import FaqItem, NewsletterSubscriber, SiteSettings, SocialLink, StaticPage
+from .models import FaqItem, NewsletterSubscriber, SiteSettings, SocialLink, StaticPage, TrustBadge
 
 
 def footer_pages():
@@ -16,6 +16,7 @@ def footer_pages():
 def site_payload(request=None):
     site = SiteSettings.current()
     links = SocialLink.objects.filter(site=site, is_active=True) if site.pk else SocialLink.objects.none()
+    badges = TrustBadge.objects.filter(site=site, is_active=True) if site.pk else TrustBadge.objects.none()
     text = site.announcement_text.strip()
     announcement = (
         {"text": text, "link": site.announcement_link or None} if site.announcement_enabled and text else None
@@ -33,6 +34,7 @@ def site_payload(request=None):
             "map_url": site.map_embed_url,
         },
         "social_links": [{"platform": link.platform, "url": link.url} for link in links],
+        "trust_badges": [{"icon": badge.icon, "title": badge.title, "subtitle": badge.subtitle} for badge in badges],
         "footer_pages": footer_pages(),
     }
 

@@ -3,10 +3,10 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.core.files.storage import default_storage
 
-from apps.siteconfig.models import ContactMessage, NewsletterSubscriber, SiteSettings, SocialLink, StaticPage
+from apps.siteconfig.models import ContactMessage, NewsletterSubscriber, SiteSettings, SocialLink, StaticPage, TrustBadge
 from apps.siteconfig.validators import validate_link, validate_map_embed
 
-from .helpers import image_file, make_link, make_page, make_settings
+from .helpers import image_file, make_badge, make_link, make_page, make_settings
 
 pytestmark = pytest.mark.django_db
 
@@ -110,6 +110,18 @@ def test_a_social_link_is_http_or_https_only():
     with pytest.raises(ValidationError) as caught:
         link.full_clean()
     assert "url" in caught.value.message_dict
+
+
+# --- trust badges -----------------------------------------------------------------------------------------
+def test_badges_are_ordered_by_order_then_id():
+    make_badge("delivery", "Free delivery", order=1)
+    make_badge("returns", "Easy returns", order=0)
+    assert list(TrustBadge.objects.values_list("title", flat=True)) == ["Easy returns", "Free delivery"]
+
+
+def test_a_badge_is_shown_as_its_title():
+    badge = make_badge("secure_payment", "Secure payment")
+    assert str(badge) == "Secure payment"
 
 
 # --- pages ------------------------------------------------------------------------------------------------

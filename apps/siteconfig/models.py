@@ -104,6 +104,31 @@ class SocialLink(models.Model):
         return self.get_platform_display()
 
 
+class TrustBadge(models.Model):
+    """A short "why buy from us" strip shown under the header on every page (free delivery, easy returns, ...)."""
+
+    class Icon(models.TextChoices):
+        DELIVERY = "delivery", "Delivery"
+        RETURNS = "returns", "Returns"
+        SECURE_PAYMENT = "secure_payment", "Secure payment"
+        CASH_ON_DELIVERY = "cash_on_delivery", "Cash on delivery"
+        SUPPORT = "support", "Support"
+        WARRANTY = "warranty", "Warranty"
+
+    site = models.ForeignKey(SiteSettings, on_delete=models.CASCADE, related_name="trust_badges")
+    icon = models.CharField(max_length=20, choices=Icon.choices)
+    title = models.CharField(max_length=60)
+    subtitle = models.CharField(max_length=120, blank=True)
+    order = models.PositiveIntegerField(default=0, help_text="Smaller first.")
+    is_active = models.BooleanField(default=True, help_text="Untick to hide it without deleting it.")
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return self.title
+
+
 class StaticPage(models.Model):
     """A page an admin writes: About us, Privacy policy, Terms, ... shown at /pages/<slug>."""
 

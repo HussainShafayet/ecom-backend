@@ -3337,6 +3337,22 @@ components:
       required:
       - database
       - status
+    IconEnum:
+      enum:
+      - delivery
+      - returns
+      - secure_payment
+      - cash_on_delivery
+      - support
+      - warranty
+      type: string
+      description: |-
+        * `delivery` - Delivery
+        * `returns` - Returns
+        * `secure_payment` - Secure payment
+        * `cash_on_delivery` - Cash on delivery
+        * `support` - Support
+        * `warranty` - Warranty
     LoginRequest:
       type: object
       properties:
@@ -4718,6 +4734,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SocialLink'
+        trust_badges:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrustBadge'
         footer_pages:
           $ref: '#/components/schemas/FooterPages'
       required:
@@ -4728,6 +4748,7 @@ components:
       - name
       - social_links
       - tagline
+      - trust_badges
     SitePayload:
       type: object
       properties:
@@ -4830,6 +4851,19 @@ components:
       required:
       - access
       - refresh
+    TrustBadge:
+      type: object
+      properties:
+        icon:
+          $ref: '#/components/schemas/IconEnum'
+        title:
+          type: string
+        subtitle:
+          type: string
+      required:
+      - icon
+      - subtitle
+      - title
     TypeEnum:
       enum:
       - product
