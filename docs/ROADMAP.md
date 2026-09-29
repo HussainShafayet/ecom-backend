@@ -32,6 +32,29 @@ sending (subscribers are already collected — see item 1), abandoned-cart recov
 VAT handling. A persisted `NotificationLog` (delivery attempts/failures, for staff visibility) once a real SMS/
 e-mail provider is chosen and failures start mattering operationally (see item 3).
 
+## Idea queue: "Available offers" at checkout (raised 2026-09-30, not started)
+
+Raised by the owner while the checkout page was being rebuilt mobile-first: when a shop has several coupons, checkout
+should *suggest* them, so a customer does not have to know a code.
+
+- **Today:** only `POST /coupons/validate/` exists (the customer types a code, the discount is previewed) and
+  `Coupon.description` is a staff-only note ("never shown to a customer"), so the storefront has nothing to list.
+- **Backend (a step of its own, with a PR):** on `Coupon` a `show_at_checkout` flag (default off, so secret and
+  influencer codes stay secret) and a customer-facing `public_title` (e.g. "25% off your first order"); and
+  `GET /coupons/available/?subtotal=` (public, throttled) answering, for the coupons that are shown and valid right now
+  (active, inside `valid_from` / `valid_until`, total redemption limit not reached): `code`, `public_title`,
+  `discount_type`, `discount_value`, `min_order_amount`, `max_discount_amount`, `eligible`, `amount_short`. `eligible` is
+  false while the subtotal is below `min_order_amount`, and `amount_short` is what is missing. A per-customer limit (per
+  phone number) cannot be known before the phone is typed: list the coupon and let `validate` decide. Contract doc,
+  `openapi.yaml`, tests and both new fields on the admin form come with it.
+- **Frontend (a paired PR in `ecom`):** under the promo box of `CheckoutSummary`, tappable chips/cards such as
+  "SUMMER25 · 25% off · min ৳500" that apply the code with one tap (the same path as typing it); one not yet reachable reads
+  "Add ৳120 more to use FREESHIP" (which also nudges the customer to add to the cart); nothing is drawn when there are no
+  offers, it is a swipe row on a phone, and it goes away once a coupon is applied. `POST /orders/` keeps validating the code
+  on the server, as it does today.
+- **Rules:** never list a coupon that is not flagged `show_at_checkout`, and never trust the frontend's idea of
+  eligibility (the server decides, always).
+
 ## A much bigger, separate idea: SaaS pricing tiers (not started, not scoped)
 
 Raised 2026-09-28 while building item 3: GoCart is currently a reusable *template* (each client gets their own
