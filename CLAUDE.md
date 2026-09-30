@@ -89,6 +89,13 @@ schema together, and never diverge from what the frontend calls without the user
   who cancels and retries is not blocked by their own cancelled attempt. `POST /coupons/validate/` previews the
   discount (guest-writable, `ScopedRateThrottle` scope `coupon`) but is not required — `POST /orders/` redeems a
   `coupon_code` on its own.
+- Flash sale: products and categories are marked `is_flash_sale` in the catalog; the optional **window** that says when the
+  mark counts is `catalog.FlashSale` (one row, `starts_at` / `ends_at`; none set = the mark counts always, as before).
+  `catalog/flash_sale.py` (`flash_sale_state`, `is_live`) is the only code that reads it: `FlashSaleProductsView` adds
+  `flash_sale` (the window and the seconds left, measured here so a customer's clock does not matter) to its page and
+  returns nothing while the sale is not live, and the flash-sale categories follow the same window. It lives in
+  `catalog`, not `siteconfig`, because `siteconfig` knows nothing about products. Catalog Manager may change it
+  (`setup_roles`); add/delete stay blocked in its admin.
 - Dashboard: `apps/dashboard` is Django-admin-only (Admin > Dashboard) — no DRF views, no API, no frontend change,
   since `../ecom` has no staff UI to call one from. `services.py` holds every aggregation as a plain read-only
   query; revenue is defined as the sum of `Payment.amount` where `status == PAID`, bucketed by `paid_at` (not

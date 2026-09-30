@@ -208,6 +208,17 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
   (`ordering=x`, `min_price=abc`) is a 400 with `field_errors`.
 - `/products/new-arrivals|best-selling|flash-sale|featured` list the products the admin flagged (best selling: most
   orders first, the others newest first) and take only `page`, `page_size`.
+- **The flash sale has an optional window** (Admin > Catalog > Flash sale, one row, `starts_at` / `ends_at`, both optional).
+  `GET /products/flash-sale/` carries it beside the page, in `data`:
+  `flash_sale: {starts_at, ends_at, is_live, starts_in_seconds, ends_in_seconds}`, or **`null` when no window is set**
+  (the flagged products then always show and there is nothing to count down to, as before). While the window is not
+  live (before `starts_at`, or from `ends_at` on) `results` is **empty** and `count` is 0, and `is_live` is false.
+  The seconds are measured by the server so a wrong clock on the customer's phone does not matter: `ends_in_seconds`
+  counts to `ends_at` (0 once it is over, `null` without an end) and `starts_in_seconds` to `starts_at` (`null` once
+  started). Rounded up, so a sale never reads 0 while it still has a moment to run. A page past the end still carries
+  `flash_sale`. `GET /products/categories/flash-sale/` follows the same window (empty while not live) and adds
+  nothing. The other lists, `GET /products/` included, are not affected: a product marked `is_flash_sale` still shows
+  there and keeps its discount; ending the sale does not take a discount off, the admin does.
 - A page past the end is an empty `results` list, not a 404.
 - **Detail** `colors` / `sizes` are **left out** (not `[]`) when they do not apply: the frontend tests `!product.colors`.
   Colours come with the default variant's colour first, sizes in size order. A colour sold without sizes has `sizes: []`

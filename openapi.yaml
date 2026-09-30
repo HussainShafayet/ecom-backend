@@ -1942,7 +1942,7 @@ paths:
   /api/v1/products/categories/flash-sale/:
     get:
       operationId: products_categories_flash_sale_list
-      summary: Flash sale categories
+      summary: Flash sale categories (empty while the flash sale is not live)
       parameters:
       - name: page
         required: false
@@ -2153,9 +2153,11 @@ paths:
   /api/v1/products/flash-sale/:
     get:
       operationId: products_flash_sale_list
-      description: Products the admin marked with `flag`, newest first unless `ordering`
-        says otherwise.
-      summary: Flash sale products
+      description: 'The products marked `is_flash_sale`, but only while the flash
+        sale is live: before it starts and after it ends `results` is empty. `flash_sale`
+        says when, and how many seconds are left, for the storefront''s countdown
+        (null when the shop set no window: the products then always show).'
+      summary: Flash sale products, with the sale's window
       parameters:
       - name: page
         required: false
@@ -2192,7 +2194,7 @@ paths:
                     type: string
                     example: OK
                   data:
-                    $ref: '#/components/schemas/PaginatedProductListList'
+                    $ref: '#/components/schemas/PaginatedFlashSaleProductsList'
           description: ''
         4XX:
           description: Error envelope
@@ -3287,6 +3289,68 @@ components:
       description: |-
         * `phone_number` - phone_number
         * `email` - email
+    FlashSaleProducts:
+      type: object
+      description: '`GET /products/flash-sale/`: the usual page of product cards,
+        plus the window.'
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductList'
+        flash_sale:
+          allOf:
+          - $ref: '#/components/schemas/FlashSaleWindow'
+          nullable: true
+          description: 'null when the shop set no window: the marked products then
+            always show, with nothing to count down to.'
+      required:
+      - count
+      - flash_sale
+      - next
+      - previous
+      - results
+    FlashSaleWindow:
+      type: object
+      description: The flash sale's window and how long is left (`catalog.flash_sale.flash_sale_state`);
+        documentation of the wire shape.
+      properties:
+        starts_at:
+          type: string
+          format: date-time
+          nullable: true
+        ends_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_live:
+          type: boolean
+          description: 'False before it starts and after it ends: `results` is then
+            empty.'
+        starts_in_seconds:
+          type: integer
+          nullable: true
+          description: Until it starts; null once started.
+        ends_in_seconds:
+          type: integer
+          nullable: true
+          description: Until it ends, 0 when it is over; null when there is no end.
+      required:
+      - ends_at
+      - ends_in_seconds
+      - is_live
+      - starts_at
+      - starts_in_seconds
     FooterPage:
       type: object
       properties:
@@ -3953,6 +4017,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CategoryList'
+    PaginatedFlashSaleProductsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlashSaleProducts'
     PaginatedProductListList:
       type: object
       required:
