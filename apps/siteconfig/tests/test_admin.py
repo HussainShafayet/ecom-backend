@@ -71,6 +71,17 @@ def test_the_settings_are_saved(admin_client):
     assert (site.site_name, site.announcement_enabled, site.announcement_link) == ("My Own Shop", True, "/products/flash-sale")
 
 
+def test_the_bar_can_be_given_an_end_and_it_can_be_emptied_again(admin_client):
+    make_settings()
+    url = reverse("admin:siteconfig_sitesettings_change", args=[1])
+    on = settings_form(announcement_enabled="on", announcement_text="Sale", announcement_ends_at_0="2030-10-03", announcement_ends_at_1="23:59:59")
+    assert admin_client.post(url, on).status_code == 302
+    ends_at = SiteSettings.load().announcement_ends_at
+    assert ends_at is not None and ends_at.year == 2030 and ends_at.month == 10
+    assert admin_client.post(url, on | {"announcement_ends_at_0": "", "announcement_ends_at_1": ""}).status_code == 302
+    assert SiteSettings.load().announcement_ends_at is None  # empty: until it is switched off
+
+
 def test_a_bad_link_or_map_is_said_in_the_form_and_nothing_is_saved(admin_client):
     make_settings(site_name="Before")
     response = admin_client.post(

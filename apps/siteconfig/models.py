@@ -30,6 +30,11 @@ class SiteSettings(FileCleanupModel):
 
     announcement_enabled = models.BooleanField(default=False, help_text="Show the bar above the header.")
     announcement_text = models.CharField(max_length=200, blank=True)
+    announcement_ends_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Show the bar until this moment, then hide it by itself (e.g. when a sale ends). Empty: until you switch it off.",
+    )
     announcement_link = models.CharField(
         max_length=300,
         blank=True,

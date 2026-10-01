@@ -102,6 +102,10 @@ schema together, and never diverge from what the frontend calls without the user
   returns nothing while the sale is not live, and the flash-sale categories follow the same window. It lives in
   `catalog`, not `siteconfig`, because `siteconfig` knows nothing about products. Catalog Manager may change it
   (`setup_roles`); add/delete stay blocked in its admin.
+- Announcement bar: free text in `siteconfig.SiteSettings` (`announcement_*`), with an optional `announcement_ends_at`.
+  `siteconfig.services.announcement(site, now)` decides what `GET /site/` answers: `null` when it is off, empty, or its end
+  has passed, else `{text, link, ends_in_seconds}` (seconds measured here, like the flash sale's). The bar is NOT tied to the
+  flash sale: `siteconfig` must not know products, so the admin sets the end by hand.
 - Dashboard: `apps/dashboard` is Django-admin-only (Admin > Dashboard) — no DRF views, no API, no frontend change,
   since `../ecom` has no staff UI to call one from. `services.py` holds every aggregation as a plain read-only
   query; revenue is defined as the sum of `Payment.amount` where `status == PAID`, bucketed by `paid_at` (not

@@ -40,6 +40,8 @@ def test_the_site_shape_is_documented(schema):
     assert set(components["Site"]["properties"]) == {
         "name", "tagline", "logo", "announcement", "contact", "social_links", "trust_badges", "footer_pages",
     }
+    assert set(components["Announcement"]["properties"]) == {"text", "link", "ends_in_seconds"}
+    assert components["Announcement"]["properties"]["ends_in_seconds"]["nullable"] is True
     assert set(components["ContactDetails"]["properties"]) == {"email", "phone", "address", "opening_hours", "map_url"}
     assert set(components["FooterPages"]["properties"]) == {"company", "service", "legal"}
     assert components["SocialLink"]["properties"]["platform"]["$ref"].endswith("/PlatformEnum")
