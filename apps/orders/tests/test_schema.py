@@ -58,7 +58,8 @@ def test_placing_an_order_documents_the_body_and_the_created_response(schema):
     body = post["responses"]["201"]["content"]["application/json"]["schema"]
     assert body["required"] == ["success", "message", "data"]
     assert set(component(schema, "OrderPlaced")["properties"]) == {
-        "order_id", "status", "created_at", "subtotal", "delivery_charge", "discount_amount", "coupon_code", "total"
+        "order_id", "status", "created_at", "subtotal", "delivery_charge", "discount_amount", "coupon_code", "total",
+        "expected_delivery",
     }
     assert component(schema, "OrderPlaced")["properties"]["order_id"]["type"] == "string"
     assert component(schema, "OrderPlaced")["properties"]["total"]["type"] == "number"  # a number, not a string
@@ -73,7 +74,7 @@ def test_the_checkout_content_documents_numbers_and_the_guest_shape(schema):
     security = schema["paths"][CHECKOUT]["get"]["security"]
     assert {} in security and {"jwtAuth": []} in security
     content = component(schema, "CheckoutContent")
-    assert set(content["properties"]) == {"delivery_charges", "shipping_addresses", "user_info"}
+    assert set(content["properties"]) == {"delivery_charges", "delivery_estimates", "shipping_addresses", "user_info"}
     assert content["properties"]["user_info"]["nullable"] is True
     assert content["properties"]["shipping_addresses"]["type"] == "array"
     charges = component(schema, "DeliveryCharges")["properties"]

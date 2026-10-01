@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MaxValueValidator
 from django.db import models
 from django.db.models import F, Q
 
@@ -13,10 +14,26 @@ class DeliveryCharge(Timestamped):
 
     shipping_type = models.CharField(max_length=20, choices=Address.ShippingType.choices, unique=True)
     amount = money_field()
+    # How long delivery takes, in calendar days from the day of the order, for the "Delivery in 2-3 days" the shop shows. Both
+    # empty = no promise made (nothing is shown): a shop sets them only once it knows what it can keep.
+    min_days = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=[MaxValueValidator(60)], help_text="The fewest days delivery takes. Empty: no estimate shown."
+    )
+    max_days = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=[MaxValueValidator(60)], help_text="The most days delivery takes (the same as the fewest for 'in 2 days')."
+    )
 
     class Meta:
         ordering = ["id"]
-        constraints = [models.CheckConstraint(condition=Q(amount__gte=0), name="deliverycharge_amount_gte_0")]
+        constraints = [
+            models.CheckConstraint(condition=Q(amount__gte=0), name="deliverycharge_amount_gte_0"),
+            models.CheckConstraint(
+                condition=Q(min_days__isnull=True, max_days__isnull=True)
+                | Q(min_days__isnull=False, max_days__isnull=False, min_days__lte=F("max_days")),
+                name="deliverycharge_days_both_or_neither_in_order",
+                violation_error_message="Give both the fewest and the most days (the most may not be less), or leave both empty.",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_shipping_type_display()}: {self.amount}"
@@ -81,6 +98,10 @@ class Order(Timestamped):
     subtotal = money_field()
     delivery_charge = money_field()
     total = money_field()
+    # What the customer was told when they ordered (the shipping type's `min_days` / `max_days` counted from that day). A snapshot,
+    # like the charge: changing the estimate later never changes an order that was already placed. Empty when none was promised.
+    expected_from = models.DateField(null=True, blank=True, editable=False)
+    expected_to = models.DateField(null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ["-created_at", "-id"]

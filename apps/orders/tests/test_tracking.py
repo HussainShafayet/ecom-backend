@@ -45,7 +45,7 @@ def test_nothing_about_who_it_is_for_or_where_it_goes_is_shown(api_client):
 
     assert set(response.json()["data"]) == {
         "order_id", "status", "status_display", "created_at", "total", "items_count", "items", "subtotal",
-        "delivery_charge", "discount_amount", "coupon_code", "payment", "history",
+        "delivery_charge", "discount_amount", "coupon_code", "payment", "history", "expected_delivery",
     }
     text = response.content.decode()
     for private in ("Rahim", "rahim@example.com", "House 12", DEFAULT_PHONE, "Gulshan"):

@@ -13,6 +13,7 @@ from . import services
 from .serializers import (
     CheckoutContentSerializer,
     OrderDetailSerializer,
+    OrderListQuerySerializer,
     OrderPlacedSerializer,
     OrderSummarySerializer,
     OrderTrackingQuerySerializer,
@@ -55,7 +56,9 @@ class OrderListCreateView(APIView):
         operation_id="orders_list",
         summary="My orders, newest first",
         description="Only the signed-in customer's own orders (a guest order belongs to nobody). Paginated like the "
-        "product lists (`?page=&page_size=`).",
+        "product lists (`?page=&page_size=`). `?status=` keeps only orders in those statuses: one, or several separated "
+        "by commas (`status=pending,confirmed,paid,shipped`); an unknown status is a 400.",
+        parameters=[OrderListQuerySerializer],
         responses=inline_serializer(
             "OrderPage",
             {
@@ -67,8 +70,11 @@ class OrderListCreateView(APIView):
         ),
     )
     def get(self, request):
+        query = OrderListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
         paginator = EnvelopePageNumberPagination()
-        page = paginator.paginate_queryset(services.customer_orders(request.user), request, view=self)
+        orders = services.customer_orders(request.user, query.validated_data["status"])
+        page = paginator.paginate_queryset(orders, request, view=self)
         return paginator.get_paginated_response(serialize_orders(OrderSummarySerializer, page, request, many=True))
 
     @extend_schema(
@@ -97,6 +103,7 @@ class OrderListCreateView(APIView):
             "discount_amount": order.discount_amount,
             "coupon_code": order.coupon.code if order.coupon_id else "",
             "total": order.total,
+            "expected_delivery": services.expected_delivery(order),
         }
         return api_response(OrderPlacedSerializer(placed).data, message="Order placed.", status=201)
 

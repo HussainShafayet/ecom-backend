@@ -60,6 +60,9 @@ schema together, and never diverge from what the frontend calls without the user
   (lock variants in id order, then products, then the day's order counter). Order status changes only through
   `orders.services.change_status()`, which checks the transition map in `orders/state.py` and always writes
   `OrderStatusHistory`. Prices are always recomputed from the database, never taken from the request.
+- The delivery estimate is the shipping type's `DeliveryCharge.min_days` / `max_days` (both empty = no promise, shown nowhere); `place_order`
+  snapshots it as `Order.expected_from` / `expected_to` (calendar days from the order's day) and `services.expected_delivery(order)` is the only
+  place that decides whether to show it (only while the order is on its way). `GET /orders/?status=` takes one status or a comma list.
 - Customers read their orders through `orders.services.customer_orders / customer_order / tracked_order` and cancel only
   through `orders.services.cancel_order()` (pending only, under the order's row lock, via `change_status`). The order
   serializers never show the staff's history note or `changed_by`; the guest tracking view (`orders/track/`, public,
