@@ -15,6 +15,7 @@ CATALOG_MANAGER = {
     "catalog.view_product", "catalog.add_product", "catalog.change_product", "catalog.delete_product",
     "catalog.view_productvariant", "catalog.add_productvariant", "catalog.change_productvariant", "catalog.delete_productvariant",
     "catalog.view_productmedia", "catalog.add_productmedia", "catalog.change_productmedia", "catalog.delete_productmedia",
+    "catalog.view_flashsale", "catalog.change_flashsale",
     "content.view_pagecontent", "content.change_pagecontent",
     "content.view_contentitem", "content.add_contentitem", "content.change_contentitem", "content.delete_contentitem",
     "siteconfig.view_staticpage", "siteconfig.add_staticpage", "siteconfig.change_staticpage", "siteconfig.delete_staticpage",

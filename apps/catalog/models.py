@@ -399,3 +399,48 @@ class ProductMedia(FileCleanupModel, Timestamped):
             elif self.thumbnail and self.thumbnail._committed:
                 self.thumbnail = ""  # the old poster belonged to the previous video
         super().save(*args, **kwargs)
+
+
+FLASH_SALE_ID = 1
+
+
+class FlashSale(models.Model):
+    """When the shop's flash sale runs: one row (the admin opens it straight from the menu). Products and categories are still
+    marked with `is_flash_sale`; this says WHEN that mark counts. Nothing set (or no row yet): the mark counts all the time, as
+    it always did, and the storefront draws no countdown. See `flash_sale.py` for what a window means."""
+
+    starts_at = models.DateTimeField(null=True, blank=True, help_text="The sale shows from this moment. Empty: it is already running.")
+    ends_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The sale stops showing at this moment, and the shop counts down to it. Empty: no deadline.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "flash sale"
+        constraints = [
+            models.CheckConstraint(condition=Q(id=FLASH_SALE_ID), name="catalog_one_flash_sale_row"),
+            models.CheckConstraint(
+                condition=Q(starts_at__isnull=True) | Q(ends_at__isnull=True) | Q(ends_at__gt=F("starts_at")),
+                name="catalog_flash_sale_ends_after_it_starts",
+                violation_error_message="The end must be after the start.",
+            ),
+        ]
+
+    def __str__(self):
+        return "Flash sale"
+
+    @classmethod
+    def load(cls):
+        """The row, created empty if the shop has none yet (the admin uses this)."""
+        return cls.objects.get_or_create(pk=FLASH_SALE_ID)[0]
+
+    @classmethod
+    def current(cls):
+        """The row, or an unsaved empty one: reading the window never writes."""
+        return cls.objects.filter(pk=FLASH_SALE_ID).first() or cls()
+
+    def save(self, *args, **kwargs):
+        self.pk = FLASH_SALE_ID
+        super().save(*args, **kwargs)

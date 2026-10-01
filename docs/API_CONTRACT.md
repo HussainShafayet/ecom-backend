@@ -208,6 +208,17 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
   (`ordering=x`, `min_price=abc`) is a 400 with `field_errors`.
 - `/products/new-arrivals|best-selling|flash-sale|featured` list the products the admin flagged (best selling: most
   orders first, the others newest first) and take only `page`, `page_size`.
+- **The flash sale has an optional window** (Admin > Catalog > Flash sale, one row, `starts_at` / `ends_at`, both optional).
+  `GET /products/flash-sale/` carries it beside the page, in `data`:
+  `flash_sale: {starts_at, ends_at, is_live, starts_in_seconds, ends_in_seconds}`, or **`null` when no window is set**
+  (the flagged products then always show and there is nothing to count down to, as before). While the window is not
+  live (before `starts_at`, or from `ends_at` on) `results` is **empty** and `count` is 0, and `is_live` is false.
+  The seconds are measured by the server so a wrong clock on the customer's phone does not matter: `ends_in_seconds`
+  counts to `ends_at` (0 once it is over, `null` without an end) and `starts_in_seconds` to `starts_at` (`null` once
+  started). Rounded up, so a sale never reads 0 while it still has a moment to run. A page past the end still carries
+  `flash_sale`. `GET /products/categories/flash-sale/` follows the same window (empty while not live) and adds
+  nothing. The other lists, `GET /products/` included, are not affected: a product marked `is_flash_sale` still shows
+  there and keeps its discount; ending the sale does not take a discount off, the admin does.
 - A page past the end is an empty `results` list, not a 404.
 - **Detail** `colors` / `sizes` are **left out** (not `[]`) when they do not apply: the frontend tests `!product.colors`.
   Colours come with the default variant's colour first, sizes in size order. A colour sold without sizes has `sizes: []`
@@ -499,6 +510,20 @@ and a manual on/off switch. Used at checkout in either or both of these ways:
   names the one reason the code can not be used right now (see below); this call is not required — `POST /orders/`
   (section 6) accepts `coupon_code` directly and validates it itself. Public, no token needed. Throttle scope
   `coupon`, `THROTTLE_COUPON`, default **30/hour per client IP**.
+- `GET /coupons/available/?subtotal=` → `200`, `data: {offers: [{code, public_title, discount_type, discount_value,
+  min_order_amount, max_discount_amount, eligible, amount_short}]}`: the coupons the shop **suggests** at checkout, so a
+  customer does not need to know a code. Only a coupon the staff ticked **Show at checkout** (and gave a **Public
+  title**, e.g. "25% off your first order") is ever listed: a coupon left unticked stays secret and still works when
+  typed. A listed coupon is one that can be used right now (switched on, inside `valid_from`/`valid_until`, total uses
+  left: the same rule `validate` applies). `min_order_amount` and `max_discount_amount` are `null` for "none".
+  `eligible` is `false` while `subtotal` is below `min_order_amount`, and `amount_short` is what the cart still needs
+  (`0` when eligible), e.g. "Add ৳120 more to use FREESHIP". At most **5**, the ones usable now first, then the
+  biggest saving (for one out of reach: what it saves at its own minimum). `subtotal` is optional (missing = an empty
+  cart); a negative or non-numeric one is a `400`. A per-customer limit needs the phone number, which checkout has not
+  got yet, so such a coupon is listed and `POST /coupons/validate/` (given `phone_number`) decides. **It is a hint,
+  not a promise:** `validate` and `POST /orders/` decide, always. Public, no token needed. Throttle scope
+  `coupon_offers`, `THROTTLE_COUPON_OFFERS`, default **120/hour per client IP** (separate from `coupon`, so drawing
+  the page never uses up the tries to type a code).
 - On `POST /orders/`, `coupon_code` is redeemed against the **server's own** subtotal (never anything the client
   computed) inside the same transaction as the order: a bad code adds one more sentence to that endpoint's unified
   `errors` list, and nothing is written. A code is looked up case- and whitespace-insensitively (stored upper case).

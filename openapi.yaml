@@ -1233,6 +1233,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/coupons/available/:
+    get:
+      operationId: coupons_available_retrieve
+      description: 'Only coupons the staff ticked *show at checkout* and that can
+        be used right now (switched on, inside their dates, uses left), at most 5:
+        the ones usable now first, then the biggest saving. `eligible` is false while
+        `subtotal` is below `min_order_amount`, and `amount_short` is what is missing.
+        Secret codes are never listed, and a per-customer limit is only checked once
+        the phone number is given to `POST /coupons/validate/`. The answer is a hint:
+        `POST /orders/` decides, always.'
+      summary: The coupons suggested at checkout, for a cart's subtotal (guests too)
+      parameters:
+      - in: query
+        name: subtotal
+        schema:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+          default: 0.00
+      tags:
+      - coupons
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/CouponOffers'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/coupons/validate/:
     post:
       operationId: coupons_validate_create
@@ -1942,7 +1997,7 @@ paths:
   /api/v1/products/categories/flash-sale/:
     get:
       operationId: products_categories_flash_sale_list
-      summary: Flash sale categories
+      summary: Flash sale categories (empty while the flash sale is not live)
       parameters:
       - name: page
         required: false
@@ -2153,9 +2208,11 @@ paths:
   /api/v1/products/flash-sale/:
     get:
       operationId: products_flash_sale_list
-      description: Products the admin marked with `flag`, newest first unless `ordering`
-        says otherwise.
-      summary: Flash sale products
+      description: 'The products marked `is_flash_sale`, but only while the flash
+        sale is live: before it starts and after it ends `results` is empty. `flash_sale`
+        says when, and how many seconds are left, for the storefront''s countdown
+        (null when the shop set no window: the products then always show).'
+      summary: Flash sale products, with the sale's window
       parameters:
       - name: page
         required: false
@@ -2192,7 +2249,7 @@ paths:
                     type: string
                     example: OK
                   data:
-                    $ref: '#/components/schemas/PaginatedProductListList'
+                    $ref: '#/components/schemas/PaginatedFlashSaleProductsList'
           description: ''
         4XX:
           description: Error envelope
@@ -3141,6 +3198,74 @@ components:
       - media_type
       - order
       - type
+    CouponOffer:
+      type: object
+      description: One coupon the shop suggests at checkout (`GET /coupons/available/`).
+      properties:
+        code:
+          type: string
+        public_title:
+          type: string
+          description: What the customer reads, e.g. '25% off your first order'.
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        discount_value:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: A percentage (0-100) or a fixed amount, by discount_type.
+        min_order_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: 'Null: no minimum.'
+        max_discount_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: 'Null: no cap.'
+        eligible:
+          type: boolean
+          description: True when the subtotal already reaches min_order_amount.
+        amount_short:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: What the cart still needs to reach min_order_amount; 0 when
+            eligible.
+      required:
+      - amount_short
+      - code
+      - discount_type
+      - discount_value
+      - eligible
+      - max_discount_amount
+      - min_order_amount
+      - public_title
+    CouponOffers:
+      type: object
+      description: What `GET /coupons/available/` answers.
+      properties:
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CouponOffer'
+      required:
+      - offers
     CouponPreview:
       type: object
       description: What `POST /coupons/validate/` answers.
@@ -3233,6 +3358,14 @@ components:
       - depth
       - height
       - width
+    DiscountTypeEnum:
+      enum:
+      - percentage
+      - fixed
+      type: string
+      description: |-
+        * `percentage` - Percentage
+        * `fixed` - Fixed amount
     EditReviewRequest:
       type: object
       description: 'The multipart body of PUT: every field is optional, and `product_id`
@@ -3287,6 +3420,68 @@ components:
       description: |-
         * `phone_number` - phone_number
         * `email` - email
+    FlashSaleProducts:
+      type: object
+      description: '`GET /products/flash-sale/`: the usual page of product cards,
+        plus the window.'
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductList'
+        flash_sale:
+          allOf:
+          - $ref: '#/components/schemas/FlashSaleWindow'
+          nullable: true
+          description: 'null when the shop set no window: the marked products then
+            always show, with nothing to count down to.'
+      required:
+      - count
+      - flash_sale
+      - next
+      - previous
+      - results
+    FlashSaleWindow:
+      type: object
+      description: The flash sale's window and how long is left (`catalog.flash_sale.flash_sale_state`);
+        documentation of the wire shape.
+      properties:
+        starts_at:
+          type: string
+          format: date-time
+          nullable: true
+        ends_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_live:
+          type: boolean
+          description: 'False before it starts and after it ends: `results` is then
+            empty.'
+        starts_in_seconds:
+          type: integer
+          nullable: true
+          description: Until it starts; null once started.
+        ends_in_seconds:
+          type: integer
+          nullable: true
+          description: Until it ends, 0 when it is over; null when there is no end.
+      required:
+      - ends_at
+      - ends_in_seconds
+      - is_live
+      - starts_at
+      - starts_in_seconds
     FooterPage:
       type: object
       properties:
@@ -3953,6 +4148,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CategoryList'
+    PaginatedFlashSaleProductsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlashSaleProducts'
     PaginatedProductListList:
       type: object
       required:

@@ -5,11 +5,19 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.pagination import EnvelopePageNumberPagination
+
 from .favourites import favourite_product_ids
 from .filters import ProductQuerySerializer, apply_product_filters, parse_product_query
+from .flash_sale import flash_sale_state, is_live
 from .models import Category, Product, ProductVariant
 from .queries import NEWEST_FIRST, order_products, visible_products, with_list_fields
-from .serializers import CategoryListSerializer, ProductDetailSerializer, ProductListSerializer
+from .serializers import (
+    CategoryListSerializer,
+    FlashSaleProductsSerializer,
+    ProductDetailSerializer,
+    ProductListSerializer,
+)
 from .shop_content import shop_content
 
 # The shop is public. A valid Bearer token only personalises `is_favourite` (an expired one is still a 401, so
@@ -40,6 +48,20 @@ class ProductListView(ProductListBase):
         return order_products(queryset, params.get("ordering"))
 
 
+class FlashSalePagination(EnvelopePageNumberPagination):
+    """The usual page, plus the window's `flash_sale` beside `results` (the view works it out once and leaves it on itself).
+    The schema says so in `FlashSaleProductsSerializer`, which the view names as its response."""
+
+    def paginate_queryset(self, queryset, request, view=None):
+        self._flash_sale = getattr(view, "flash_sale", None)
+        return super().paginate_queryset(queryset, request, view)
+
+    def get_paginated_response(self, data):
+        response = super().get_paginated_response(data)
+        response.data["flash_sale"] = self._flash_sale
+        return response
+
+
 class FlaggedProductListView(ProductListBase):
     """Products the admin marked with `flag`, newest first unless `ordering` says otherwise."""
 
@@ -61,9 +83,22 @@ class BestSellingProductsView(FlaggedProductListView):
     ordering = ("-total_orders", *NEWEST_FIRST)
 
 
-@extend_schema(tags=TAGS, summary="Flash sale products")
+@extend_schema(
+    tags=TAGS,
+    summary="Flash sale products, with the sale's window",
+    description="The products marked `is_flash_sale`, but only while the flash sale is live: before it starts and after it "
+    "ends `results` is empty. `flash_sale` says when, and how many seconds are left, for the storefront's countdown "
+    "(null when the shop set no window: the products then always show).",
+    responses=FlashSaleProductsSerializer,
+)
 class FlashSaleProductsView(FlaggedProductListView):
     flag = "is_flash_sale"
+    pagination_class = FlashSalePagination
+
+    def get_queryset(self):
+        self.flash_sale = flash_sale_state()
+        queryset = super().get_queryset()
+        return queryset if is_live(self.flash_sale) else queryset.none()
 
 
 @extend_schema(tags=TAGS, summary="Featured products")
@@ -139,9 +174,13 @@ class AllCategoriesView(CategoryListView):
     pass
 
 
-@extend_schema(tags=TAGS, summary="Flash sale categories")
+@extend_schema(tags=TAGS, summary="Flash sale categories (empty while the flash sale is not live)")
 class FlashSaleCategoriesView(CategoryListView):
     flag = "is_flash_sale"
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset if is_live(flash_sale_state()) else queryset.none()
 
 
 @extend_schema(tags=TAGS, summary="New arrival categories")

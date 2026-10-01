@@ -17,6 +17,7 @@ CATALOG_MANAGER = {
         "product": ("view", "add", "change", "delete"),
         "productvariant": ("view", "add", "change", "delete"),
         "productmedia": ("view", "add", "change", "delete"),
+        "flashsale": ("view", "change"),  # the one window; add/delete stays blocked
     },
     "content": {
         "pagecontent": ("view", "change"),  # the six pages are fixed; add/delete stays blocked

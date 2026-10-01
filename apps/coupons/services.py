@@ -15,6 +15,8 @@ from apps.core.money import ZERO, quantize_money
 
 from .models import Coupon
 
+MAX_OFFERS = 5  # a phone shows a few, not the whole shelf
+
 
 def _eligibility_problem(coupon, subtotal, phone_number):
     """One sentence, or None, for everything that does not need the database's own row lock to check."""
@@ -62,6 +64,39 @@ def validate_coupon(code, subtotal, phone_number=None):
     if problem:
         raise ValidationError(problem)
     return coupon
+
+
+def available_offers(subtotal):
+    """The coupons to suggest at checkout for a cart of `subtotal`: only those the staff flagged `show_at_checkout`
+    that can be used at all right now (switched on, inside their window, uses left), at most `MAX_OFFERS`, the ones
+    the customer can use now first, then the biggest saving (for one still out of reach: what it saves at its own
+    minimum), and each with `eligible` and how much more the cart needs (`amount_short`).
+
+    "Can be used at all" is `_eligibility_problem` itself, asked at the order size that clears the minimum, so this
+    list can never disagree with `validate_coupon` about a window or a use limit. A per-customer limit needs the
+    phone number, which checkout has not got yet: the coupon is listed and `validate` decides once it is typed.
+    The frontend only draws this: it never decides eligibility, `POST /orders/` re-checks everything."""
+    subtotal = quantize_money(subtotal)
+    ranked = []
+    for coupon in Coupon.objects.filter(show_at_checkout=True, is_active=True):
+        minimum = coupon.min_order_amount or ZERO
+        at = max(subtotal, minimum)
+        if _eligibility_problem(coupon, at, None):
+            continue
+        short = max(minimum - subtotal, ZERO)
+        offer = {
+            "code": coupon.code,
+            "public_title": coupon.public_title,
+            "discount_type": coupon.discount_type,
+            "discount_value": coupon.discount_value,
+            "min_order_amount": minimum or None,
+            "max_discount_amount": coupon.max_discount_amount,
+            "eligible": short == ZERO,
+            "amount_short": short,
+        }
+        ranked.append(((short > ZERO, -compute_discount(coupon, at), coupon.code), offer))
+    ranked.sort(key=lambda pair: pair[0])
+    return [offer for _, offer in ranked[:MAX_OFFERS]]
 
 
 def compute_discount(coupon, subtotal):

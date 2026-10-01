@@ -168,6 +168,7 @@ REST_FRAMEWORK = {
         "contact": env("THROTTLE_CONTACT", default="5/hour"),  # a visitor writing to the shop, per IP
         "newsletter": env("THROTTLE_NEWSLETTER", default="10/hour"),  # a visitor subscribing, per IP
         "coupon": env("THROTTLE_COUPON", default="30/hour"),  # previewing a coupon's discount, per IP
+        "coupon_offers": env("THROTTLE_COUPON_OFFERS", default="120/hour"),  # listing the coupons suggested at checkout, per IP
     },
 }
 

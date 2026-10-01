@@ -298,6 +298,31 @@ class ProductDetailSerializer(ProductListSerializer):
 # --- categories ---------------------------------------------------------------------------------------------
 
 
+class FlashSaleWindowSerializer(serializers.Serializer):
+    """The flash sale's window and how long is left (`catalog.flash_sale.flash_sale_state`); documentation of the wire shape."""
+
+    starts_at = serializers.DateTimeField(allow_null=True)
+    ends_at = serializers.DateTimeField(allow_null=True)
+    is_live = serializers.BooleanField(help_text="False before it starts and after it ends: `results` is then empty.")
+    starts_in_seconds = serializers.IntegerField(allow_null=True, help_text="Until it starts; null once started.")
+    ends_in_seconds = serializers.IntegerField(
+        allow_null=True, help_text="Until it ends, 0 when it is over; null when there is no end."
+    )
+
+
+class FlashSaleProductsSerializer(serializers.Serializer):
+    """`GET /products/flash-sale/`: the usual page of product cards, plus the window."""
+
+    count = serializers.IntegerField()
+    next = serializers.URLField(allow_null=True)
+    previous = serializers.URLField(allow_null=True)
+    results = ProductListSerializer(many=True)
+    flash_sale = FlashSaleWindowSerializer(
+        allow_null=True,
+        help_text="null when the shop set no window: the marked products then always show, with nothing to count down to.",
+    )
+
+
 class CategoryListSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     has_discount = serializers.BooleanField(read_only=True)

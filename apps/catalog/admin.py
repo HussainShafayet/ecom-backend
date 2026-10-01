@@ -2,10 +2,14 @@ from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
 from django.forms import BaseInlineFormSet
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 
 from . import pricing, services
-from .models import Brand, Category, Color, Product, ProductMedia, ProductVariant, Size, Tag
+from .flash_sale import flash_sale_state
+from .models import Brand, Category, Color, FlashSale, Product, ProductMedia, ProductVariant, Size, Tag
 
 
 @admin.register(Category)
@@ -200,3 +204,32 @@ class ProductAdmin(admin.ModelAdmin):
     @admin.action(description="Hide the selected products from the shop")
     def deactivate(self, request, queryset):
         self.message_user(request, f"{queryset.update(is_active=False)} product(s) are now hidden.")
+
+
+@admin.register(FlashSale)
+class FlashSaleAdmin(admin.ModelAdmin):
+    """One row: the menu entry opens it directly. The products and categories in the sale are still ticked "Flash sale" on
+    their own pages; this says when that tick counts."""
+
+    fields = ("starts_at", "ends_at", "status")
+    readonly_fields = ("status",)
+
+    @admin.display(description="Right now")
+    def status(self, obj):
+        state = flash_sale_state()
+        if state is None:
+            return "No window set: everything ticked \"Flash sale\" shows all the time, and the shop draws no countdown."
+        if state["is_live"]:
+            return "Live: the shop shows the sale" + (" and counts down to its end." if state["ends_at"] else ", with no end set.")
+        if state["starts_in_seconds"] is not None:
+            return f"Not started: the shop hides the sale until {timezone.localtime(state['starts_at']):%d %b %Y, %H:%M}."
+        return "Ended: the shop hides the sale. Set a new end, or clear both boxes, to show it again."
+
+    def changelist_view(self, request, extra_context=None):
+        return redirect(reverse("admin:catalog_flashsale_change", args=[FlashSale.load().pk]))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
