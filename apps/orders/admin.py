@@ -160,12 +160,18 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(DeliveryCharge)
 class DeliveryChargeAdmin(admin.ModelAdmin):
-    """One row per shipping type (a migration creates them): staff change the amount, nothing else. Orders keep the
-    amount they were placed with."""
+    """One row per shipping type (a migration creates them): staff change the amount and how many days delivery takes
+    (the estimate the shop shows; empty = none). Orders keep the amount, and the dates, they were placed with."""
 
-    list_display = ("shipping_type", "amount", "updated_at")
-    fields = ("shipping_type", "amount", "updated_at")
+    list_display = ("shipping_type", "amount", "delivery_time", "updated_at")
+    fields = ("shipping_type", "amount", "min_days", "max_days", "updated_at")
     readonly_fields = ("shipping_type", "updated_at")
+
+    @admin.display(description="Delivery takes")
+    def delivery_time(self, charge):
+        if charge.min_days is None or charge.max_days is None:
+            return "no estimate"
+        return f"{charge.min_days} days" if charge.min_days == charge.max_days else f"{charge.min_days}-{charge.max_days} days"
 
     def has_add_permission(self, request):
         return False

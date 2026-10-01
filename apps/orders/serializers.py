@@ -9,6 +9,7 @@ from apps.cart.services import MAX_QUANTITY
 from apps.catalog.serializers import absolute_url
 
 from .models import Order, OrderItem, OrderStatusHistory
+from . import services
 from .services import PAYMENT_TYPES
 
 MONEY = {"max_digits": 12, "decimal_places": 2}
@@ -83,6 +84,13 @@ class PlaceOrderSerializer(serializers.Serializer):
         return attrs
 
 
+class ExpectedDeliverySerializer(serializers.Serializer):
+    """When to expect an order, as the customer was told when they placed it (calendar days from that day)."""
+
+    earliest = serializers.DateField()
+    latest = serializers.DateField()
+
+
 class OrderPlacedSerializer(serializers.Serializer):
     """What `POST /orders/` answers. The frontend reads `order_id`; the rest is what the confirmation page shows."""
 
@@ -94,11 +102,15 @@ class OrderPlacedSerializer(serializers.Serializer):
     discount_amount = serializers.DecimalField(**MONEY, help_text="What the coupon took off. 0 when there was none.")
     coupon_code = serializers.CharField(help_text='"" when no coupon was used.')
     total = serializers.DecimalField(**MONEY)
+    expected_delivery = ExpectedDeliverySerializer(
+        allow_null=True, help_text="null when the shop made no estimate for this shipping type."
+    )
 
 
 # --- reading an order (a customer's own, or a guest's tracking) ---------------------------------------------------
 class OrderItemSerializer(serializers.ModelSerializer):
-    """One line, as it was bought (the snapshot), plus the product's current picture and slug for the link."""
+    """One line, as it was bought (the snapshot), plus the product's current picture and slug for the link. `product_id` and
+    `variant_id` say what to put in a cart to buy it again (null when that product or variant has been deleted since)."""
 
     product_slug = serializers.SerializerMethodField(help_text="null when the product has been deleted since.")
     image = serializers.SerializerMethodField(help_text="Absolute URL of the product's main image, or null.")
@@ -107,6 +119,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = (
             "product_id",
+            "variant_id",
             "product_slug",
             "product_name",
             "variant_label",
@@ -178,6 +191,9 @@ class OrderDetailSerializer(OrderSummarySerializer):
         help_text="True while the order is pending: only then may the customer cancel it."
     )
     coupon_code = serializers.SerializerMethodField(help_text='"" when no coupon was used.')
+    expected_delivery = serializers.SerializerMethodField(
+        help_text="`{earliest, latest}` dates while the order is on its way and the shop made an estimate, else null."
+    )
 
     class Meta(OrderSummarySerializer.Meta):
         fields = OrderSummarySerializer.Meta.fields + (
@@ -197,6 +213,7 @@ class OrderDetailSerializer(OrderSummarySerializer):
             "payment",
             "history",
             "can_cancel",
+            "expected_delivery",
         )
 
     @extend_schema_field(OrderPaymentSerializer(allow_null=True))
@@ -213,6 +230,11 @@ class OrderDetailSerializer(OrderSummarySerializer):
     def get_coupon_code(self, order) -> str:
         return order.coupon.code if order.coupon_id else ""
 
+    @extend_schema_field(ExpectedDeliverySerializer(allow_null=True))
+    def get_expected_delivery(self, order):
+        expected = services.expected_delivery(order)
+        return ExpectedDeliverySerializer(expected).data if expected else None
+
 
 class OrderTrackingSerializer(OrderDetailSerializer):
     """What a guest gets for an order number and its phone number: the progress and what was ordered, nothing about
@@ -220,8 +242,29 @@ class OrderTrackingSerializer(OrderDetailSerializer):
 
     class Meta(OrderSummarySerializer.Meta):
         fields = OrderSummarySerializer.Meta.fields + (
-            "subtotal", "delivery_charge", "discount_amount", "coupon_code", "payment", "history"
+            "subtotal", "delivery_charge", "discount_amount", "coupon_code", "payment", "history", "expected_delivery"
         )
+
+
+class OrderListQuerySerializer(serializers.Serializer):
+    """The query of `GET /orders/`: which statuses to keep."""
+
+    status = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="One status, or several separated by commas: " + ", ".join(Order.Status.values) + ".",
+    )
+
+    def validate_status(self, value):
+        wanted = [part.strip().lower() for part in value.split(",") if part.strip()]
+        unknown = [part for part in wanted if part not in Order.Status.values]
+        if unknown:
+            raise serializers.ValidationError(f"Unknown status: {', '.join(unknown)}.")
+        return list(dict.fromkeys(wanted))
+
+    def validate(self, attrs):
+        attrs.setdefault("status", [])
+        return attrs
 
 
 class OrderTrackingQuerySerializer(serializers.Serializer):
@@ -243,9 +286,22 @@ class UserInfoSerializer(serializers.Serializer):
     email = serializers.CharField(help_text='"" when the customer has none.')
 
 
+class DeliveryEstimateSerializer(serializers.Serializer):
+    min_days = serializers.IntegerField()
+    max_days = serializers.IntegerField()
+
+
+class DeliveryEstimatesSerializer(serializers.Serializer):
+    inside_dhaka = DeliveryEstimateSerializer(required=False)
+    outside_dhaka = DeliveryEstimateSerializer(required=False)
+
+
 class CheckoutContentSerializer(serializers.Serializer):
     delivery_charges = DeliveryChargesSerializer(
         help_text="A shipping type without a configured charge is left out (ordering with it is a 400)."
+    )
+    delivery_estimates = DeliveryEstimatesSerializer(
+        help_text="How many calendar days delivery takes, per shipping type: only for a type the shop made an estimate for."
     )
     shipping_addresses = AddressSerializer(many=True, help_text="The customer's saved addresses; [] for a guest.")
     user_info = UserInfoSerializer(allow_null=True, help_text="null for a guest.")

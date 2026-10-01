@@ -53,6 +53,7 @@ def test_a_guest_places_an_order(api_client):
         "discount_amount": 0.0,
         "coupon_code": "",
         "total": 1060.0,
+        "expected_delivery": None,  # no estimate was set for the shipping type
     }
     order = Order.objects.get()
     assert parse_datetime(body["data"]["created_at"]) == order.created_at  # the same instant, written in Dhaka time

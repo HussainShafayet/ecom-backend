@@ -23,6 +23,7 @@ cancels and retries is not blocked by their own cancelled attempt — and writes
 Both announce themselves through `signals.py` (inside their transaction) so the payments app can follow along.
 """
 from collections import defaultdict
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
@@ -139,8 +140,9 @@ def place_order(user=None, data=None):
         problems = []
         wanted, named = _resolve_items(items, problems)
 
-        delivery_charge = (
-            DeliveryCharge.objects.filter(shipping_type=data["shipping_type"]).values_list("amount", flat=True).first()
+        delivery_charge, min_days, max_days = (
+            DeliveryCharge.objects.filter(shipping_type=data["shipping_type"]).values_list("amount", "min_days", "max_days").first()
+            or (None, None, None)
         )
 
         lines = []  # (locked variant, quantity) of the lines that can be sold
@@ -207,6 +209,8 @@ def place_order(user=None, data=None):
             subtotal=subtotal,
             delivery_charge=delivery_charge,
             total=subtotal + delivery_charge - discount_amount,
+            expected_from=timezone.localdate() + timedelta(days=min_days) if min_days is not None else None,
+            expected_to=timezone.localdate() + timedelta(days=max_days) if max_days is not None else None,
         )
         for row in rows:
             row.order = order
@@ -273,9 +277,22 @@ CANCEL_REFUSED = (
 )
 
 
-def customer_orders(user):
-    """The signed-in customer's orders, newest first (a queryset, so it paginates)."""
-    return Order.objects.filter(user=user).select_related("coupon").prefetch_related("items")
+def customer_orders(user, statuses=None):
+    """The signed-in customer's orders, newest first (a queryset, so it paginates); only those in `statuses` when some are given."""
+    orders = Order.objects.filter(user=user).select_related("coupon").prefetch_related("items")
+    return orders.filter(status__in=statuses) if statuses else orders
+
+
+# While an order is on its way the customer is told when to expect it; once it has arrived, or will not, there is nothing to expect.
+EXPECTING = (Order.Status.PENDING, Order.Status.CONFIRMED, Order.Status.PAID, Order.Status.SHIPPED)
+
+
+def expected_delivery(order):
+    """`{earliest, latest}` (dates) the customer was told to expect this order, or None: no estimate was promised, or the order is no
+    longer on its way (delivered, cancelled, returned, refunded)."""
+    if order.expected_from is None or order.expected_to is None or order.status not in EXPECTING:
+        return None
+    return {"earliest": order.expected_from, "latest": order.expected_to}
 
 
 def customer_order(user, number):
@@ -331,8 +348,14 @@ def checkout_content(user=None):
     """What `GET /content/checkout/` shows: the delivery charges, and for a signed-in customer their saved
     addresses (oldest first) and the details that pre-fill the form."""
     user_info = {"name": user.name, "phone_number": user.phone_number, "email": user.email or ""} if user else None
+    charges = list(DeliveryCharge.objects.all())
     return {
-        "delivery_charges": {charge.shipping_type: charge.amount for charge in DeliveryCharge.objects.all()},
+        "delivery_charges": {charge.shipping_type: charge.amount for charge in charges},
+        "delivery_estimates": {
+            charge.shipping_type: {"min_days": charge.min_days, "max_days": charge.max_days}
+            for charge in charges
+            if charge.min_days is not None and charge.max_days is not None
+        },
         "shipping_addresses": list(Address.objects.filter(user=user)) if user else [],
         "user_info": user_info,
     }

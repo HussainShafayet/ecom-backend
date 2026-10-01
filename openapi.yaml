@@ -1383,9 +1383,18 @@ paths:
   /api/v1/orders/:
     get:
       operationId: orders_list
-      description: Only the signed-in customer's own orders (a guest order belongs
-        to nobody). Paginated like the product lists (`?page=&page_size=`).
+      description: 'Only the signed-in customer''s own orders (a guest order belongs
+        to nobody). Paginated like the product lists (`?page=&page_size=`). `?status=`
+        keeps only orders in those statuses: one, or several separated by commas (`status=pending,confirmed,paid,shipped`);
+        an unknown status is a 400.'
       summary: My orders, newest first
+      parameters:
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: 'One status, or several separated by commas: pending, confirmed,
+          paid, shipped, delivered, returned, cancelled, refunded.'
       tags:
       - orders
       security:
@@ -3112,6 +3121,11 @@ components:
           - $ref: '#/components/schemas/DeliveryCharges'
           description: A shipping type without a configured charge is left out (ordering
             with it is a 400).
+        delivery_estimates:
+          allOf:
+          - $ref: '#/components/schemas/DeliveryEstimates'
+          description: 'How many calendar days delivery takes, per shipping type:
+            only for a type the shop made an estimate for.'
         shipping_addresses:
           type: array
           items:
@@ -3124,6 +3138,7 @@ components:
           description: null for a guest.
       required:
       - delivery_charges
+      - delivery_estimates
       - shipping_addresses
       - user_info
     ColorOption:
@@ -3371,6 +3386,23 @@ components:
           minimum: -10000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+    DeliveryEstimate:
+      type: object
+      properties:
+        min_days:
+          type: integer
+        max_days:
+          type: integer
+      required:
+      - max_days
+      - min_days
+    DeliveryEstimates:
+      type: object
+      properties:
+        inside_dhaka:
+          $ref: '#/components/schemas/DeliveryEstimate'
+        outside_dhaka:
+          $ref: '#/components/schemas/DeliveryEstimate'
     Dimension:
       type: object
       properties:
@@ -3432,6 +3464,20 @@ components:
             type: string
             format: binary
           description: Photos (JPEG, PNG, WebP) and videos (MP4, WebM).
+    ExpectedDelivery:
+      type: object
+      description: When to expect an order, as the customer was told when they placed
+        it (calendar days from that day).
+      properties:
+        earliest:
+          type: string
+          format: date
+        latest:
+          type: string
+          format: date
+      required:
+      - earliest
+      - latest
     Faq:
       type: object
       properties:
@@ -3847,11 +3893,19 @@ components:
           readOnly: true
           description: 'True while the order is pending: only then may the customer
             cancel it.'
+        expected_delivery:
+          allOf:
+          - $ref: '#/components/schemas/ExpectedDelivery'
+          nullable: true
+          readOnly: true
+          description: '`{earliest, latest}` dates while the order is on its way and
+            the shop made an estimate, else null.'
       required:
       - can_cancel
       - coupon_code
       - created_at
       - delivery_charge
+      - expected_delivery
       - history
       - items
       - items_count
@@ -3866,10 +3920,15 @@ components:
       - total
     OrderItem:
       type: object
-      description: One line, as it was bought (the snapshot), plus the product's current
-        picture and slug for the link.
+      description: |-
+        One line, as it was bought (the snapshot), plus the product's current picture and slug for the link. `product_id` and
+        `variant_id` say what to put in a cart to buy it again (null when that product or variant has been deleted since).
       properties:
         product_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        variant_id:
           type: integer
           nullable: true
           readOnly: true
@@ -3927,6 +3986,7 @@ components:
       - quantity
       - sku
       - unit_price
+      - variant_id
       - variant_label
     OrderItemInputRequest:
       type: object
@@ -4052,11 +4112,17 @@ components:
           minimum: -10000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+        expected_delivery:
+          allOf:
+          - $ref: '#/components/schemas/ExpectedDelivery'
+          nullable: true
+          description: null when the shop made no estimate for this shipping type.
       required:
       - coupon_code
       - created_at
       - delivery_charge
       - discount_amount
+      - expected_delivery
       - order_id
       - status
       - subtotal
@@ -4185,10 +4251,18 @@ components:
             $ref: '#/components/schemas/OrderStep'
           readOnly: true
           description: Every status the order has been in, oldest first.
+        expected_delivery:
+          allOf:
+          - $ref: '#/components/schemas/ExpectedDelivery'
+          nullable: true
+          readOnly: true
+          description: '`{earliest, latest}` dates while the order is on its way and
+            the shop made an estimate, else null.'
       required:
       - coupon_code
       - created_at
       - delivery_charge
+      - expected_delivery
       - history
       - items
       - items_count

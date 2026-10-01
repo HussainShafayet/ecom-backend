@@ -28,6 +28,7 @@ def test_a_guest_gets_the_charges_no_addresses_and_no_user(api_client):
         "message": "OK",
         "data": {
             "delivery_charges": {"inside_dhaka": 60.0, "outside_dhaka": 120.0},
+            "delivery_estimates": {},  # the shop has not said how long delivery takes
             "shipping_addresses": [],
             "user_info": None,
         },

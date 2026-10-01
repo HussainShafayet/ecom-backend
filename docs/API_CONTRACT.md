@@ -188,7 +188,7 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
 | `GET /products/categories/` and `…/flash-sale/`, `…/new-arrival/`, `…/best-selling/`, `…/feature/` | paginated `{id, name, slug, image, has_discount, discount_amount, discount_type}` |
 | `GET /content/pages/{home,newarrival,flashsale,best_selling,feature,category}/` | `{page_content:{image_sliders[], video_sliders[], left_banner, right_banner}}` |
 | `GET /content/shop/` | `{categories:[{name,slug,children[]}], brands:[name], tags:[name], colors:[{name,hex_code}], sizes:[name], price_range:{min_range,max_range}, discounts:[{discount_type,value}]}` |
-| `GET /content/checkout/` | `{delivery_charges:{inside_dhaka, outside_dhaka}` (numbers)`, shipping_addresses:[Address]` (guest: `[]`)`, user_info:{name,phone_number,email}` (guest: `null`)`}` |
+| `GET /content/checkout/` | `{delivery_charges:{inside_dhaka, outside_dhaka}` (numbers)`, delivery_estimates:{inside_dhaka?, outside_dhaka?}` (`{min_days, max_days}`, only where the shop made one)`, shipping_addresses:[Address]` (guest: `[]`)`, user_info:{name,phone_number,email}` (guest: `null`)`}` |
 
 **How the catalog behaves**
 
@@ -247,6 +247,10 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
     them): `inside_dhaka` 60 and `outside_dhaka` 120 by default, edited by staff in the admin (Orders > Delivery
     charges). A shipping type without a configured charge is left out of the object (an order with it is a 400).
     The frontend treats a charge of `0` as "not set" and blocks the form, so free delivery needs a frontend change.
+  - `delivery_estimates`: how long delivery takes, in calendar days from the day of the order, **per shipping type the
+    shop made an estimate for** (`{inside_dhaka: {min_days: 2, max_days: 3}}`, "Delivery in 2-3 days"; both the same
+    for "in 2 days"). Staff set the two numbers in Orders > Delivery charges (both empty = no promise, the default, and
+    that type is left out; `{}` when none). Placing an order snapshots the dates (`expected_delivery`, below).
   - `shipping_addresses` is the signed-in customer's saved addresses (section 3), oldest first; `[]` for a guest.
   - `user_info` is `{name, phone_number, email}` of the signed-in customer (`phone_number` is always a string,
     `email` is `""` when there is none), `null` for a guest. The frontend uses it to pre-fill the form.
@@ -269,7 +273,8 @@ All media URLs are absolute.
 ```
 
 `201 → {success: true, message: "Order placed.", data: {order_id, status, created_at, subtotal, delivery_charge,
-discount_amount, coupon_code, total}}`; `order_id` is the human-readable, URL-safe order number, e.g.
+discount_amount, coupon_code, total, expected_delivery}}`; `expected_delivery` is `{earliest, latest}` (dates,
+`YYYY-MM-DD`) when the shop made an estimate for the shipping type, else `null`; `order_id` is the human-readable, URL-safe order number, e.g.
 `GC-20260923-0001` (the frontend navigates to `/order-confirmation/{order_id}`), and the rest is what that page can
 show without another call (a guest has no way to read the order afterwards except by tracking it, see below).
 `discount_amount` is `0` and `coupon_code` is `""` when no coupon was used.
@@ -378,26 +383,32 @@ Orders placed before the payments app existed get their payment from a data migr
 `{order_id}` is the order number (`GC-20260923-0001`). All of these answer in the usual envelope.
 
 - `GET /orders/` → `data: {count, next, previous, results: [Order summary]}`. The signed-in customer's **own** orders,
-  newest first, paginated like the product lists (`?page=&page_size=`). A guest order belongs to nobody, so it is in no
-  list. Order summary: `{order_id, status, status_display, created_at, total, items_count, items: [Item]}`;
+  newest first, paginated like the product lists (`?page=&page_size=`). `?status=` keeps only orders in those statuses:
+  one, or several separated by commas (`?status=pending,confirmed,paid,shipped`; upper/lower case and spaces do not
+  matter); `count` and the pages follow the filter, a status nobody is in is an empty list, an **unknown** status is a
+  `400` (`Unknown status: x.`). Statuses: `pending, confirmed, paid, shipped, delivered, returned, cancelled,
+  refunded`. A guest order belongs to nobody, so it is in no list. Order summary: `{order_id, status, status_display, created_at, total, items_count, items: [Item]}`;
   `items_count` counts units.
 - `GET /orders/{order_id}/` → `data: Order` = the summary plus `name, email, phone_number, shipping_type, shipping_area,
   shipping_division, shipping_district, shipping_thana, shipping_address, subtotal, delivery_charge, discount_amount,
-  coupon_code, can_cancel, payment, history`. `discount_amount` is `0` and `coupon_code` is `""` when no coupon was
+  coupon_code, can_cancel, payment, history, expected_delivery`. `expected_delivery` is `{earliest, latest}` (dates) while
+  the order is `pending`, `confirmed`, `paid` or `shipped` and the shop made an estimate when it was placed, else `null`
+  (also once it is delivered, cancelled, returned or refunded). `discount_amount` is `0` and `coupon_code` is `""` when no coupon was
   used. `payment` is `{method, method_display, status, status_display, amount, paid_at, refunded_at}` or
   `null` (the payment of section 6, newest one). `history` is every status the order has been in, oldest first:
   `[{status, status_display, created_at}]` (who moved it and the staff's note are not shown). `can_cancel` is true
   while the order is `pending`. Somebody else's order, a guest order and an unknown number are the same `404`.
-- `Item = {product_id, product_slug, product_name, variant_label, sku, unit_price, base_price, quantity, line_total,
-  image}`: the snapshot of what was bought and paid; `product_id` and `product_slug` are `null` once the product was
-  deleted, `image` is the product's current main image (absolute URL) or `null`.
+- `Item = {product_id, variant_id, product_slug, product_name, variant_label, sku, unit_price, base_price, quantity,
+  line_total, image}`: the snapshot of what was bought and paid; `product_id` and `product_slug` are `null` once the
+  product was deleted, `variant_id` once the variant was (`product_id` + `variant_id` are what a cart takes, so an order
+  can be bought again), `image` is the product's current main image (absolute URL) or `null`.
 - `POST /orders/{order_id}/cancel/` (no body) → `200`, `data: Order` (now `cancelled`). Only a **pending** order: the
   goods go back into stock, `total_orders` goes down and the payment is cancelled, all through the same status change
   as the staff's. Any other status is a `400` (`Only a pending order can be cancelled. To change an order that is
   already being handled, please contact us.`); somebody else's order is a `404`. Two clicks at once cancel it once.
   Shares the `order` throttle scope with placing orders.
 - `GET /orders/track/?order_id=GC-…&phone_number=+880…` (**public**, no token needed; a stale token is ignored) →
-  `data: Order summary` + `subtotal, delivery_charge, discount_amount, coupon_code, payment, history`, and **nothing
+  `data: Order summary` + `subtotal, delivery_charge, discount_amount, coupon_code, payment, history, expected_delivery`, and **nothing
   about who the order is for or where it goes** (no name, e-mail, phone or address): an order number is easy to guess, the phone number is the only
   secret. A wrong number and a wrong phone number are the same `404` (`No order matches these details.`), the number
   may be typed in any case, missing or malformed input is a `400`. Throttled per client IP (scope `order_track`,
