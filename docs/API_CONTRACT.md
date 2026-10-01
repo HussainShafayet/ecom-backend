@@ -186,7 +186,7 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
 |---|---|
 | `GET /products/search-suggestions/?q=` | `["name", …]` (≤ 10 strings) |
 | `GET /products/categories/` and `…/flash-sale/`, `…/new-arrival/`, `…/best-selling/`, `…/feature/` | paginated `{id, name, slug, image, has_discount, discount_amount, discount_type}` |
-| `GET /content/pages/{home,newarrival,flashsale,best_selling,feature,category}/` | `{page_content:{image_sliders[], video_sliders[], left_banner, right_banner}}` |
+| `GET /content/pages/{home,newarrival,flashsale,best_selling,feature,category}/` | `{page_content:{image_sliders[], video_sliders[], left_banner, right_banner, mid_banner}}` |
 | `GET /content/shop/` | `{categories:[{name,slug,children[]}], brands:[name], tags:[name], colors:[{name,hex_code}], sizes:[name], price_range:{min_range,max_range}, discounts:[{discount_type,value}]}` |
 | `GET /content/checkout/` | `{delivery_charges:{inside_dhaka, outside_dhaka}` (numbers)`, shipping_addresses:[Address]` (guest: `[]`)`, user_info:{name,phone_number,email}` (guest: `null`)`}` |
 
@@ -233,11 +233,14 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
 - `/content/shop`: only categories, brands, tags, colours and sizes that a visible product really has;
   `price_range` is the lowest and highest price customers pay; `discounts` are the distinct (type, value) pairs.
 - `/content/pages/{page}/` (`home, newarrival, flashsale, best_selling, feature, category`; any other page is a 404).
-  Answers `{page_content: {image_sliders[], video_sliders[], left_banner, right_banner}}`; a page nobody filled in yet
-  gives empty lists and null banners, never an error. Each item has `type` (`product` | `category` | `external`),
-  `link` (the product or category **slug**, null for `external`), `external_link` (null unless `external`), `media`
-  (absolute URL), `media_type` and `caption` (`""` when empty). `order` is **1, 2, 3...** in the order the admin
-  arranged the items, not the stored number, because the frontend uses it as the React key of a slide.
+  Answers `{page_content: {image_sliders[], video_sliders[], left_banner, right_banner, mid_banner}}`; a page nobody
+  filled in yet gives empty lists and null banners, never an error. Each item has `type` (`product` | `category` |
+  `external`), `link` (the product or category **slug**, null for `external`), `external_link` (null unless
+  `external`), `media` (absolute URL), `media_type`, `caption` (`""` when empty) and `cta_label` (the words on the
+  button over a slide or the mid-page banner: `"Shop Now"` unless the admin wrote others, `""` = no button).
+  `order` is **1, 2, 3...** in the order the admin arranged the items, not the stored number, because the frontend
+  uses it as the React key of a slide. `mid_banner` is a wide picture (image only) the Home page draws between its
+  sections; at most one is active per page, and only the Home page can have one (it is `null` on every other page).
   An item is visible while it is active and its product or category is visible. A page has at most one active
   left banner and one active right banner. Slider and left banner take an image, the video slider a video, the
   right banner either. `external_link` is always `http(s)://`.

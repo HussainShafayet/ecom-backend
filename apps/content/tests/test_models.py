@@ -154,6 +154,49 @@ def test_sliders_are_not_limited():
     assert ContentItem.objects.filter(placement=Placement.IMAGE_SLIDER).count() == 4
 
 
+# --- the mid-page banner and the button's words ----------------------------------------------------------------
+def test_a_page_has_one_active_mid_page_banner():
+    make_item(placement=Placement.MID_BANNER)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        make_item(placement=Placement.MID_BANNER)
+
+
+def test_the_form_check_says_so_for_a_second_mid_page_banner():
+    make_item(placement=Placement.MID_BANNER)
+    second = unsaved(placement=Placement.MID_BANNER, link_type=LinkType.EXTERNAL, external_link="https://example.com")
+    assert "__all__" in errors_of(second)
+
+
+def test_a_spare_inactive_mid_page_banner_is_fine_and_the_other_sides_are_independent():
+    make_item(placement=Placement.MID_BANNER)
+    make_item(placement=Placement.MID_BANNER, is_active=False)
+    make_item(placement=Placement.LEFT_BANNER)
+    make_item(placement=Placement.RIGHT_BANNER)
+    assert ContentItem.objects.filter(placement=Placement.MID_BANNER).count() == 2
+
+
+def test_the_mid_page_banner_is_for_the_home_page_only():
+    for page in (Page.NEW_ARRIVAL, Page.FLASH_SALE, Page.BEST_SELLING, Page.FEATURED, Page.CATEGORY):
+        assert "placement" in errors_of(unsaved(placement=Placement.MID_BANNER, page=page, link_type=LinkType.EXTERNAL, external_link="https://example.com"))
+    with pytest.raises(ValidationError):
+        make_item(page=Page.FLASH_SALE, placement=Placement.MID_BANNER)  # and saving refuses it too, not only the form
+
+
+def test_the_mid_page_banner_takes_an_image_only():
+    assert "media" in errors_of(unsaved(placement=Placement.MID_BANNER, video=True, link_type=LinkType.EXTERNAL, external_link="https://example.com"))
+
+
+def test_a_new_item_has_the_button_every_slide_had_and_its_words_can_be_changed_or_cleared():
+    item = make_item()
+    assert item.cta_label == "Shop Now"
+    item.cta_label = "See the deals"
+    item.full_clean()
+    item.cta_label = ""
+    item.full_clean()  # no button
+    item.cta_label = "x" * 31
+    assert "cta_label" in errors_of(item)
+
+
 # --- cleanup ---------------------------------------------------------------------------------------------
 def test_deleting_an_item_removes_its_file(django_capture_on_commit_callbacks):
     item = make_item()
