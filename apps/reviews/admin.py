@@ -30,16 +30,17 @@ class ReviewAdmin(admin.ModelAdmin):
     """Reviews are written by customers (through the API, after a delivered order). Staff moderate: hide one (untick
     `is_approved`), delete one, remove a photo. The product's rating follows on its own."""
 
-    list_display = ("product", "user", "rating", "short_comment", "is_approved", "created_at")
+    list_display = ("product", "user", "rating", "short_comment", "is_approved", "show_on_homepage", "created_at")
     list_display_links = ("product", "short_comment")
-    list_filter = ("is_approved", "rating")
+    list_editable = ("show_on_homepage",)
+    list_filter = ("is_approved", "show_on_homepage", "rating")
     list_select_related = ("product", "user")
     search_fields = ("product__name", "product__sku", "user__name", "user__phone_number", "comment")
     date_hierarchy = "created_at"
     readonly_fields = ("product", "user", "rating", "comment", "created_at", "updated_at")
-    fields = (*readonly_fields, "is_approved")
+    fields = (*readonly_fields, "is_approved", "show_on_homepage")
     inlines = (ReviewMediaInline,)
-    actions = ("show", "hide")
+    actions = ("show", "hide", "feature", "unfeature")
 
     @admin.display(description="Comment")
     def short_comment(self, review):
@@ -63,3 +64,13 @@ class ReviewAdmin(admin.ModelAdmin):
     @admin.action(description="Hide the selected reviews")
     def hide(self, request, queryset):
         self._set_approved(request, queryset, False)
+
+    @admin.action(description="Show the selected reviews on the homepage")
+    def feature(self, request, queryset):
+        changed = queryset.update(show_on_homepage=True)  # no counter depends on it: nothing to recount
+        self.message_user(request, f"{changed} review(s) will be shown on the homepage.", messages.SUCCESS)
+
+    @admin.action(description="Remove the selected reviews from the homepage")
+    def unfeature(self, request, queryset):
+        changed = queryset.update(show_on_homepage=False)
+        self.message_user(request, f"{changed} review(s) removed from the homepage.", messages.SUCCESS)

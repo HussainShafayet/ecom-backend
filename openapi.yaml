@@ -2470,6 +2470,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/products/reviews/featured/:
+    get:
+      operationId: products_reviews_featured_retrieve
+      description: 'At most 8. The reviews the staff ticked *Show on homepage* (newest
+        first) when any of them can be shown; otherwise the shop''s own pick: approved,
+        4-5 stars, a comment of at least 40 characters, a delivered purchase, one
+        per customer, best rating first. A hidden review or a hidden product is never
+        listed. The reviewer is a short name (`Rahim U.`), never a phone number or
+        an e-mail address. An empty list means the shop has nothing to show yet.'
+      summary: Reviews for the homepage (guests too)
+      tags:
+      - reviews
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/FeaturedReviews'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/products/search-suggestions/:
     get:
       operationId: products_search_suggestions_retrieve
@@ -3412,6 +3456,65 @@ components:
             $ref: '#/components/schemas/Faq'
       required:
       - faqs
+    FeaturedReview:
+      type: object
+      description: 'One review as the homepage shows it: who (a short name), what
+        they said, and what they bought.'
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        reviewer:
+          type: string
+          readOnly: true
+          description: '''Rahim U.'': first name and the initial of the last; ''Customer''
+            without a name.'
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        comment:
+          type: string
+          maxLength: 2000
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        verified:
+          type: boolean
+          readOnly: true
+          description: True when the review came from a delivered purchase.
+        product_name:
+          type: string
+          readOnly: true
+        product_slug:
+          type: string
+          readOnly: true
+        image:
+          type: string
+          format: uri
+          readOnly: true
+          description: The first photo of the review (absolute URL), else null.
+      required:
+      - comment
+      - created_at
+      - id
+      - image
+      - product_name
+      - product_slug
+      - rating
+      - reviewer
+      - verified
+    FeaturedReviews:
+      type: object
+      description: What `GET /products/reviews/featured/` answers.
+      properties:
+        reviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeaturedReview'
+      required:
+      - reviews
     FieldEnum:
       enum:
       - phone_number

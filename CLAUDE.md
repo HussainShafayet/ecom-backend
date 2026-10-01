@@ -117,6 +117,9 @@ schema together, and never diverge from what the frontend calls without the user
   right. Nothing writes those two columns by hand. `bulk_create` and `queryset.update()` send no signals: recount
   yourself. Uploads: type from the bytes (`core.validators.detect_media_format`), stored name gets the matching
   extension, API `media_urls[].type` is the MIME type.
+  `GET /products/reviews/featured/` (homepage) is `services.featured_reviews()`: the reviews the staff ticked
+  (`Review.show_on_homepage`) if any can be shown, else the shop's own pick (4-5 stars, a 40+ character comment, a
+  delivered purchase, one per customer); max 8, `short_name()` ("Rahim U.") is the only name it gives away.
 - Requests: `core.middleware.UploadSizeLimitMiddleware` answers a multipart upload over `MAX_UPLOAD_REQUEST_MB` with a
   413 before reading it; `envelope_exception_handler` turns Django's `SuspiciousOperation`s (body over
   `DATA_UPLOAD_MAX_MEMORY_SIZE`, too many fields/files) into 413/400, never a 500.

@@ -32,6 +32,11 @@ class Review(models.Model):
         help_text="Reviews are shown at once. Untick to hide one from the shop (it then no longer counts in the "
         "product's rating, and its author can not edit it).",
     )
+    show_on_homepage = models.BooleanField(
+        default=False,
+        help_text="Show this review on the shop's homepage. Tick the ones you want: only those are shown (up to 8). "
+        "With none ticked, the shop picks good ones itself (4-5 stars, a real comment, a delivered purchase).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

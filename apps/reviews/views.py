@@ -2,6 +2,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serial
 from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import SAFE_METHODS, AllowAny, IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -11,7 +12,13 @@ from apps.core.pagination import EnvelopePageNumberPagination
 from apps.core.responses import api_response
 
 from . import services
-from .serializers import EditReviewSerializer, ReviewQuerySerializer, ReviewSerializer, WriteReviewSerializer
+from .serializers import (
+    EditReviewSerializer,
+    FeaturedReviewsSerializer,
+    ReviewQuerySerializer,
+    ReviewSerializer,
+    WriteReviewSerializer,
+)
 
 TAGS = ["reviews"]
 MULTIPART = "multipart/form-data"
@@ -27,6 +34,28 @@ class ReviewPagination(EnvelopePageNumberPagination):
         response.data["review_status"] = self.review_status
         response.data["order_id"] = self.order_id
         return response
+
+
+class FeaturedReviewsView(APIView):
+    """Public: what customers say, for the shop's homepage."""
+
+    authentication_classes = []  # who is asking does not matter, so a stale token can not turn this into a 401
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Reviews for the homepage (guests too)",
+        description="At most 8. The reviews the staff ticked *Show on homepage* (newest first) when any of them can be "
+        "shown; otherwise the shop's own pick: approved, 4-5 stars, a comment of at least 40 characters, a delivered "
+        "purchase, one per customer, best rating first. A hidden review or a hidden product is never listed. The "
+        "reviewer is a short name (`Rahim U.`), never a phone number or an e-mail address. An empty list means the "
+        "shop has nothing to show yet.",
+        responses=FeaturedReviewsSerializer,
+        auth=[],
+    )
+    def get(self, request):
+        reviews = services.featured_reviews()
+        return Response(FeaturedReviewsSerializer({"reviews": reviews}, context={"request": request}).data)
 
 
 class ReviewListCreateView(APIView):
