@@ -24,7 +24,7 @@ def visible_items(page):
 
 
 def page_content(page, request=None):
-    """`{image_sliders, video_sliders, left_banner, right_banner}` of a page. Never raises for an empty page.
+    """`{image_sliders, video_sliders, left_banner, right_banner, mid_banner}` of a page. Never raises for an empty page.
 
     `order` counts 1, 2, 3... in the order the admin arranged the items: the frontend uses it as the React key of
     a slide, so it must be unique even when the admin left every stored order at its default of 0.
@@ -42,6 +42,7 @@ def page_content(page, request=None):
             "media": absolute_url(request, item.media),
             "media_type": item.media_type,
             "caption": item.caption,
+            "cta_label": item.cta_label,
         }
 
     def entries(placement):
@@ -56,4 +57,5 @@ def page_content(page, request=None):
         "video_sliders": entries(Placement.VIDEO_SLIDER),
         "left_banner": banner(Placement.LEFT_BANNER),
         "right_banner": banner(Placement.RIGHT_BANNER),
+        "mid_banner": banner(Placement.MID_BANNER),
     }

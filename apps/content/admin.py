@@ -37,7 +37,7 @@ class ContentItemInline(admin.StackedInline):
         ("placement", "order", "is_active"),
         ("link_type", "product", "category", "external_link"),
         ("media", "preview"),
-        "caption",
+        ("caption", "cta_label"),
     )
     readonly_fields = ("preview",)
     autocomplete_fields = ("product", "category")

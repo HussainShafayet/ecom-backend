@@ -26,6 +26,7 @@ class Placement(models.TextChoices):
     VIDEO_SLIDER = "video_slider", "Video slider"
     LEFT_BANNER = "left_banner", "Left banner"
     RIGHT_BANNER = "right_banner", "Right banner"
+    MID_BANNER = "mid_banner", "Mid-page banner"
 
 
 class LinkType(models.TextChoices):
@@ -39,15 +40,19 @@ class MediaType(models.TextChoices):
     VIDEO = "video", "Video"
 
 
-BANNERS = (Placement.LEFT_BANNER, Placement.RIGHT_BANNER)
-# What each placement can show. The frontend draws the left banner with an <img> only and the video slider with
-# a <video> only; the right banner handles both.
+BANNERS = (Placement.LEFT_BANNER, Placement.RIGHT_BANNER, Placement.MID_BANNER)
+# What each placement can show. The frontend draws the left banner and the mid-page banner with an <img> only and the
+# video slider with a <video> only; the right banner handles both.
 ALLOWED_MEDIA = {
     Placement.IMAGE_SLIDER: {"image"},
     Placement.VIDEO_SLIDER: {"video"},
     Placement.LEFT_BANNER: {"image"},
     Placement.RIGHT_BANNER: {"image", "video"},
+    Placement.MID_BANNER: {"image"},
 }
+# Placements that only one page draws (the others would never show them)
+ONLY_ON = {Placement.MID_BANNER: Page.HOME}
+DEFAULT_CTA = "Shop Now"
 http_url = URLValidator(schemes=["http", "https"])  # never `javascript:` and friends: the frontend renders it as a link
 
 
@@ -72,7 +77,8 @@ class ContentItem(FileCleanupModel, Timestamped):
     placement = models.CharField(
         max_length=20,
         choices=Placement.choices,
-        help_text="A page has at most one active left banner and one active right banner.",
+        help_text="A page has at most one active left banner, one active right banner and one active mid-page banner "
+        "(the Home page only).",
     )
     order = models.PositiveIntegerField(default=0, help_text="Smaller first.")
     link_type = models.CharField(max_length=10, choices=LinkType.choices, default=LinkType.PRODUCT)
@@ -83,10 +89,17 @@ class ContentItem(FileCleanupModel, Timestamped):
     media = models.FileField(
         upload_to=RandomUploadTo("content"),
         validators=[validate_media_upload],
-        help_text="Slider and left banner: an image. Video slider: a video. Right banner: either.",
+        help_text="Slider, left banner and mid-page banner: an image. Video slider: a video. Right banner: either.",
     )
     media_type = models.CharField(max_length=10, choices=MediaType.choices, editable=False)
     caption = models.CharField(max_length=150, blank=True)
+    cta_label = models.CharField(
+        max_length=30,
+        blank=True,
+        default=DEFAULT_CTA,
+        help_text="The words on the button over a slide or the mid-page banner (\"Shop Now\", \"See the deals\"). "
+        "Leave it empty for no button.",
+    )
     is_active = models.BooleanField(default=True, help_text="Untick to hide it without deleting it.")
 
     class Meta:
@@ -140,6 +153,11 @@ class ContentItem(FileCleanupModel, Timestamped):
             wanted = " or ".join(sorted(allowed))
             raise ValidationError({"media": f"A {self.get_placement_display().lower()} needs an {wanted}, not a {self.media_type}."})
 
+    def _check_placement_fits_page(self):
+        only = ONLY_ON.get(self.placement)
+        if only and self.page_id and self.page.page != only:
+            raise ValidationError({"placement": f"A {self.get_placement_display().lower()} is only drawn on the {Page(only).label} page."})
+
     def clean(self):
         super().clean()
         self._normalize()
@@ -152,8 +170,10 @@ class ContentItem(FileCleanupModel, Timestamped):
         if field and not getattr(self, field):
             raise ValidationError({field: message})
         self._check_media_fits_placement()
+        self._check_placement_fits_page()
 
     def save(self, *args, **kwargs):
         self._normalize()
         self._check_media_fits_placement()
+        self._check_placement_fits_page()
         super().save(*args, **kwargs)

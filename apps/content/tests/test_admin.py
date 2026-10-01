@@ -99,3 +99,18 @@ def test_a_video_in_an_image_slider_is_refused_in_the_form(admin_client):
     assert response.status_code == 200
     assert "needs an image" in response.content.decode()
     assert not ContentItem.objects.exists()
+
+
+def test_the_form_has_the_buttons_words_and_a_mid_page_banner_choice(admin_client):
+    html = admin_client.get(change_url()).content.decode()
+    assert 'name="items-__prefix__-cta_label"' in html and "Shop Now" in html
+    assert "Mid-page banner" in html
+
+
+def test_a_mid_page_banner_is_accepted_on_the_home_page_and_refused_elsewhere(admin_client):
+    ok = admin_client.post(change_url(Page.HOME), form_data([(Placement.MID_BANNER, True)]), follow=True)
+    assert ok.status_code == 200 and ContentItem.objects.filter(placement=Placement.MID_BANNER).count() == 1
+
+    refused = admin_client.post(change_url(Page.FLASH_SALE), form_data([(Placement.MID_BANNER, True)]))
+    assert refused.status_code == 200 and "is only drawn on the Home page" in refused.content.decode()
+    assert ContentItem.objects.filter(placement=Placement.MID_BANNER, page__page=Page.FLASH_SALE).count() == 0

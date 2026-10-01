@@ -12,6 +12,9 @@ class ContentItemSerializer(serializers.Serializer):
     media = serializers.URLField()
     media_type = serializers.ChoiceField(choices=MediaType.choices)
     caption = serializers.CharField(allow_blank=True)
+    cta_label = serializers.CharField(
+        allow_blank=True, help_text="The words on the button over a slide or the mid-page banner; empty: no button."
+    )
 
 
 class PageContentSerializer(serializers.Serializer):
@@ -19,6 +22,7 @@ class PageContentSerializer(serializers.Serializer):
     video_sliders = ContentItemSerializer(many=True)
     left_banner = ContentItemSerializer(allow_null=True)
     right_banner = ContentItemSerializer(allow_null=True)
+    mid_banner = ContentItemSerializer(allow_null=True, help_text="A wide banner between the sections of the Home page; null on the other pages.")
 
 
 class PagePayloadSerializer(serializers.Serializer):

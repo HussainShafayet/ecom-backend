@@ -35,6 +35,13 @@ def test_every_page_gets_sliders_and_a_right_banner(catalog):
     assert page_content("feature")["left_banner"] is None
 
 
+def test_only_the_home_page_gets_a_mid_page_banner(catalog):
+    seed()
+    mid = page_content("home")["mid_banner"]
+    assert mid is not None and mid["type"] == "product" and mid["cta_label"]
+    assert page_content("feature")["mid_banner"] is None
+
+
 def test_the_home_banners_link_to_products_because_the_frontend_only_draws_those_links(catalog):
     seed()
     home = page_content("home")
@@ -55,8 +62,9 @@ def test_flush_starts_over_and_removes_the_old_pictures(catalog, django_capture_
     with django_capture_on_commit_callbacks(execute=True):
         seed("--flush")
     assert not storage.exists(name)
-    assert ContentItem.objects.count() == 25
+    assert ContentItem.objects.count() == 26
     assert ContentItem.objects.filter(placement=Placement.LEFT_BANNER).count() == 1
+    assert ContentItem.objects.filter(placement=Placement.MID_BANNER).count() == 1
 
 
 def test_it_refuses_to_run_without_debug_unless_forced(catalog, settings):

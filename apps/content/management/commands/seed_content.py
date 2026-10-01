@@ -12,8 +12,10 @@ from apps.content.models import ContentItem, LinkType, Page, PageContent, Placem
 
 SLIDER_SIZE = (1200, 400)
 BANNER_SIZE = (600, 600)
+MID_BANNER_SIZE = (1200, 300)
 SLIDES_PER_PAGE = 3
 CAPTIONS = ["New season", "Big savings", "Just landed", "Weekend deal", "Top picks", "Limited offer"]
+CTA_LABELS = ["Shop Now", "See the deals", "Explore"]
 PALETTE = [(52, 86, 139), (139, 52, 86), (52, 139, 96), (176, 116, 40), (96, 52, 139), (40, 120, 150)]
 
 
@@ -54,6 +56,7 @@ class Command(BaseCommand):
         slots.append((Placement.RIGHT_BANNER, 0))
         if content.page == Page.HOME:
             slots.append((Placement.LEFT_BANNER, 0))
+            slots.append((Placement.MID_BANNER, 0))
         for placement, order in slots:
             # The home page draws its banners as links to a product; the other links work on every slider.
             product_only = content.page == Page.HOME and placement != Placement.IMAGE_SLIDER
@@ -64,7 +67,7 @@ class Command(BaseCommand):
         caption = rng.choice(CAPTIONS)
         link_type = LinkType.PRODUCT if product_only else rng.choice([LinkType.PRODUCT, LinkType.CATEGORY])
         target = {"product": rng.choice(products)} if link_type == LinkType.PRODUCT else {"category": rng.choice(categories)}
-        size = SLIDER_SIZE if placement == Placement.IMAGE_SLIDER else BANNER_SIZE
+        size = {Placement.IMAGE_SLIDER: SLIDER_SIZE, Placement.MID_BANNER: MID_BANNER_SIZE}.get(placement, BANNER_SIZE)
         picture = self._picture(caption, size, rng.choice(PALETTE))
         ContentItem.objects.create(
             page=content,
@@ -72,6 +75,7 @@ class Command(BaseCommand):
             order=order,
             link_type=link_type,
             caption=caption,
+            cta_label=rng.choice(CTA_LABELS),
             media=ContentFile(picture, name=f"{content.page}-{placement}-{order}.jpg"),
             **target,
         )
