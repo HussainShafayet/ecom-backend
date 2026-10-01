@@ -3249,8 +3249,13 @@ components:
           $ref: '#/components/schemas/MediaTypeEnum'
         caption:
           type: string
+        cta_label:
+          type: string
+          description: 'The words on the button over a slide or the mid-page banner;
+            empty: no button.'
       required:
       - caption
+      - cta_label
       - external_link
       - link
       - media
@@ -4290,9 +4295,16 @@ components:
           allOf:
           - $ref: '#/components/schemas/ContentItem'
           nullable: true
+        mid_banner:
+          allOf:
+          - $ref: '#/components/schemas/ContentItem'
+          nullable: true
+          description: A wide banner between the sections of the Home page; null on
+            the other pages.
       required:
       - image_sliders
       - left_banner
+      - mid_banner
       - right_banner
       - video_sliders
     PagePayload:

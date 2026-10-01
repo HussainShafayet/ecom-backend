@@ -25,6 +25,6 @@ def test_the_response_is_the_envelope_around_page_content(schema):
     assert body["required"] == ["success", "message", "data"]
     assert body["properties"]["data"]["$ref"].endswith("/PagePayload")
     content = schema["components"]["schemas"]["PageContent"]
-    assert set(content["properties"]) == {"image_sliders", "video_sliders", "left_banner", "right_banner"}
+    assert set(content["properties"]) == {"image_sliders", "video_sliders", "left_banner", "right_banner", "mid_banner"}
     item = schema["components"]["schemas"]["ContentItem"]
-    assert set(item["properties"]) == {"order", "type", "link", "external_link", "media", "media_type", "caption"}
+    assert set(item["properties"]) == {"order", "type", "link", "external_link", "media", "media_type", "caption", "cta_label"}

@@ -8,8 +8,8 @@ from apps.content.tests.helpers import make_item
 
 pytestmark = pytest.mark.django_db
 
-ITEM_KEYS = {"order", "type", "link", "external_link", "media", "media_type", "caption"}
-CONTENT_KEYS = {"image_sliders", "video_sliders", "left_banner", "right_banner"}
+ITEM_KEYS = {"order", "type", "link", "external_link", "media", "media_type", "caption", "cta_label"}
+CONTENT_KEYS = {"image_sliders", "video_sliders", "left_banner", "right_banner", "mid_banner"}
 # The exact spellings the frontend calls (contentService.js).
 FRONTEND_PATHS = [
     "/api/v1/content/pages/home",
@@ -41,7 +41,7 @@ def test_every_page_the_frontend_asks_for_answers(api_client, path):
 
 
 def test_a_page_nobody_filled_in_is_empty_not_an_error(api_client):
-    assert content(api_client) == {"image_sliders": [], "video_sliders": [], "left_banner": None, "right_banner": None}
+    assert content(api_client) == {"image_sliders": [], "video_sliders": [], "left_banner": None, "right_banner": None, "mid_banner": None}
 
 
 def test_a_missing_page_row_still_answers_empty(api_client):
@@ -190,3 +190,41 @@ def test_one_query_however_many_items(api_client):
         make_item(target=make_category(f"C{ContentItem.objects.count()}"))
         make_item(placement=Placement.VIDEO_SLIDER, video=True)
     assert queries() == small == 1
+
+
+# --- the button's words, and the mid-page banner -----------------------------------------------------------------
+def test_a_slide_says_what_its_button_says(api_client):
+    make_item(order=1, caption="Summer sale")  # nothing typed: the button every slide had
+    make_item(order=2, caption="Winter", cta_label="See the deals")
+    make_item(order=3, caption="No button", cta_label="")
+
+    default, custom, none = content(api_client)["image_sliders"]
+
+    assert (default["cta_label"], custom["cta_label"], none["cta_label"]) == ("Shop Now", "See the deals", "")
+
+
+def test_the_home_page_has_a_mid_page_banner_of_its_own(api_client):
+    product = make_product("Kettle")
+    make_item(placement=Placement.MID_BANNER, target=product, caption="Kettles", cta_label="Boil it")
+    make_item(placement=Placement.LEFT_BANNER)
+
+    data = content(api_client)
+
+    assert data["mid_banner"]["link"] == "kettle" and data["mid_banner"]["caption"] == "Kettles"
+    assert (data["mid_banner"]["order"], data["mid_banner"]["media_type"], data["mid_banner"]["cta_label"]) == (1, "image", "Boil it")
+    assert data["left_banner"]["link"] != "kettle"  # not the same slot
+    assert data["image_sliders"] == [] and data["right_banner"] is None
+
+
+def test_the_other_pages_never_have_one(api_client):
+    make_item(placement=Placement.MID_BANNER)
+    for page in ("newarrival", "flashsale", "best_selling", "feature", "category"):
+        assert content(api_client, page)["mid_banner"] is None
+
+
+def test_a_mid_page_banner_that_is_switched_off_or_points_at_a_hidden_product_is_not_sent(api_client):
+    hidden = make_product("Old", is_active=False)
+    make_item(placement=Placement.MID_BANNER, is_active=False)
+    make_item(placement=Placement.MID_BANNER, target=hidden)
+
+    assert content(api_client)["mid_banner"] is None
