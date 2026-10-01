@@ -510,6 +510,20 @@ and a manual on/off switch. Used at checkout in either or both of these ways:
   names the one reason the code can not be used right now (see below); this call is not required — `POST /orders/`
   (section 6) accepts `coupon_code` directly and validates it itself. Public, no token needed. Throttle scope
   `coupon`, `THROTTLE_COUPON`, default **30/hour per client IP**.
+- `GET /coupons/available/?subtotal=` → `200`, `data: {offers: [{code, public_title, discount_type, discount_value,
+  min_order_amount, max_discount_amount, eligible, amount_short}]}`: the coupons the shop **suggests** at checkout, so a
+  customer does not need to know a code. Only a coupon the staff ticked **Show at checkout** (and gave a **Public
+  title**, e.g. "25% off your first order") is ever listed: a coupon left unticked stays secret and still works when
+  typed. A listed coupon is one that can be used right now (switched on, inside `valid_from`/`valid_until`, total uses
+  left: the same rule `validate` applies). `min_order_amount` and `max_discount_amount` are `null` for "none".
+  `eligible` is `false` while `subtotal` is below `min_order_amount`, and `amount_short` is what the cart still needs
+  (`0` when eligible), e.g. "Add ৳120 more to use FREESHIP". At most **5**, the ones usable now first, then the
+  biggest saving (for one out of reach: what it saves at its own minimum). `subtotal` is optional (missing = an empty
+  cart); a negative or non-numeric one is a `400`. A per-customer limit needs the phone number, which checkout has not
+  got yet, so such a coupon is listed and `POST /coupons/validate/` (given `phone_number`) decides. **It is a hint,
+  not a promise:** `validate` and `POST /orders/` decide, always. Public, no token needed. Throttle scope
+  `coupon_offers`, `THROTTLE_COUPON_OFFERS`, default **120/hour per client IP** (separate from `coupon`, so drawing
+  the page never uses up the tries to type a code).
 - On `POST /orders/`, `coupon_code` is redeemed against the **server's own** subtotal (never anything the client
   computed) inside the same transaction as the order: a bad code adds one more sentence to that endpoint's unified
   `errors` list, and nothing is written. A code is looked up case- and whitespace-insensitively (stored upper case).

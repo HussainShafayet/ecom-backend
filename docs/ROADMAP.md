@@ -24,6 +24,7 @@ test suite.
 | 8 | CI (GitHub Actions), error tracking (Sentry), backups | None of this exists yet. | **Done** — step 18. `.github/workflows/ci.yml` runs tests + schema validation on every push/PR to main; Sentry is optional (`SENTRY_DSN`, empty = off, no personal data sent); `scripts/backup.sh` dumps the database and media on a cron, see README > Backups. |
 | 9 | Trust badges ("free delivery", "easy returns", ...) | A "free delivery / easy returns" strip under the header did not exist, and it could not be added without shipping code. | **Done** — step 19, in `apps/siteconfig`. `GET /site/` gains `trust_badges` (active ones, admin's order); edited inline on Admin > Site settings. `icon` is a fixed choice list the frontend maps to its own icon. Frontend: `layout/TrustBadgeBar` (ecom repo) draws it on every page. |
 | 10 | Flash sale window (countdown) | The flash sale had only an on/off mark, so a storefront could not show "ends in 02:14:09" or hide the sale when it is over. | **Done** — step 20, in `apps/catalog`. One optional window (`FlashSale`: `starts_at` / `ends_at`, Admin > Catalog > Flash sale, Catalog Manager may edit it). `GET /products/flash-sale/` gains `flash_sale` (the window and the seconds left, measured by the server) and is empty while the sale is not live; nothing set = the old always-on behaviour. Frontend: a countdown on the homepage section and the flash-sale page (ecom repo). |
+| 11 | "Available offers" at checkout | With several coupons a customer had to know a code to get a discount: nothing on the page suggested one. | **Done** — step 21, in `apps/coupons`. `Coupon` gains `show_at_checkout` (default off: secret and influencer codes stay secret) and a customer-facing `public_title` (required once shown), both on the admin form. `GET /coupons/available/?subtotal=` (public, throttled, scope `coupon_offers`) lists up to 5 shown coupons that can be used right now, with `eligible` and `amount_short`. Frontend: tappable chips under the promo box of `CheckoutSummary` that apply the code, and "Add ৳120 more to use FREESHIP" for one out of reach (ecom repo); `POST /orders/` still validates the code on the server. |
 
 ## Later (P2, not launch-blocking)
 
@@ -32,29 +33,6 @@ recently-viewed / back-in-stock products, SEO (page titles, meta, sitemap), prod
 sending (subscribers are already collected — see item 1), abandoned-cart recovery, district-level delivery charges,
 VAT handling. A persisted `NotificationLog` (delivery attempts/failures, for staff visibility) once a real SMS/
 e-mail provider is chosen and failures start mattering operationally (see item 3).
-
-## Idea queue: "Available offers" at checkout (raised 2026-09-30, not started)
-
-Raised by the owner while the checkout page was being rebuilt mobile-first: when a shop has several coupons, checkout
-should *suggest* them, so a customer does not have to know a code.
-
-- **Today:** only `POST /coupons/validate/` exists (the customer types a code, the discount is previewed) and
-  `Coupon.description` is a staff-only note ("never shown to a customer"), so the storefront has nothing to list.
-- **Backend (a step of its own, with a PR):** on `Coupon` a `show_at_checkout` flag (default off, so secret and
-  influencer codes stay secret) and a customer-facing `public_title` (e.g. "25% off your first order"); and
-  `GET /coupons/available/?subtotal=` (public, throttled) answering, for the coupons that are shown and valid right now
-  (active, inside `valid_from` / `valid_until`, total redemption limit not reached): `code`, `public_title`,
-  `discount_type`, `discount_value`, `min_order_amount`, `max_discount_amount`, `eligible`, `amount_short`. `eligible` is
-  false while the subtotal is below `min_order_amount`, and `amount_short` is what is missing. A per-customer limit (per
-  phone number) cannot be known before the phone is typed: list the coupon and let `validate` decide. Contract doc,
-  `openapi.yaml`, tests and both new fields on the admin form come with it.
-- **Frontend (a paired PR in `ecom`):** under the promo box of `CheckoutSummary`, tappable chips/cards such as
-  "SUMMER25 · 25% off · min ৳500" that apply the code with one tap (the same path as typing it); one not yet reachable reads
-  "Add ৳120 more to use FREESHIP" (which also nudges the customer to add to the cart); nothing is drawn when there are no
-  offers, it is a swipe row on a phone, and it goes away once a coupon is applied. `POST /orders/` keeps validating the code
-  on the server, as it does today.
-- **Rules:** never list a coupon that is not flagged `show_at_checkout`, and never trust the frontend's idea of
-  eligibility (the server decides, always).
 
 ## A much bigger, separate idea: SaaS pricing tiers (not started, not scoped)
 

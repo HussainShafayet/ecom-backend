@@ -24,6 +24,16 @@ class Coupon(Timestamped):
     valid_from = models.DateTimeField(null=True, blank=True, help_text="Empty: usable from the moment it is saved.")
     valid_until = models.DateTimeField(null=True, blank=True, help_text="Empty: never expires on its own.")
     is_active = models.BooleanField(default=True, help_text="Untick to turn it off immediately, without waiting for an expiry date.")
+    show_at_checkout = models.BooleanField(
+        default=False,
+        help_text="Suggest this coupon to customers at checkout, so they do not need to know the code. "
+        "Leave it off for secret codes (influencers, a sorry-for-the-delay code): it still works when typed.",
+    )
+    public_title = models.CharField(
+        max_length=60,
+        blank=True,
+        help_text='What the customer reads on the offer, e.g. "25% off your first order". Needed to show the coupon at checkout.',
+    )
 
     class Meta:
         ordering = ["-created_at", "-id"]
@@ -45,6 +55,11 @@ class Coupon(Timestamped):
                 condition=Q(valid_from__isnull=True) | Q(valid_until__isnull=True) | Q(valid_until__gt=F("valid_from")),
                 name="coupon_valid_until_after_valid_from",
             ),
+            CheckConstraint(
+                condition=Q(show_at_checkout=False) | ~Q(public_title=""),
+                name="coupon_shown_at_checkout_needs_a_title",
+                violation_error_message="Write the title customers will see before showing this coupon at checkout.",
+            ),
         ]
 
     def __str__(self):
@@ -52,4 +67,5 @@ class Coupon(Timestamped):
 
     def save(self, *args, **kwargs):
         self.code = self.code.strip().upper()
+        self.public_title = self.public_title.strip()
         super().save(*args, **kwargs)

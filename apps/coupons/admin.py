@@ -5,10 +5,10 @@ from .models import Coupon
 
 @admin.register(Coupon)
 class CouponAdmin(admin.ModelAdmin):
-    list_display = ("code", "discount_type", "discount_value", "times_used", "max_redemptions", "is_active", "valid_until")
-    list_editable = ("is_active",)
-    list_filter = ("discount_type", "is_active")
-    search_fields = ("code", "description")
+    list_display = ("code", "discount_type", "discount_value", "times_used", "max_redemptions", "is_active", "show_at_checkout", "valid_until")
+    list_editable = ("is_active", "show_at_checkout")
+    list_filter = ("discount_type", "is_active", "show_at_checkout")
+    search_fields = ("code", "description", "public_title")
     readonly_fields = ("times_used", "created_at", "updated_at")
     actions = ("activate", "deactivate")
 

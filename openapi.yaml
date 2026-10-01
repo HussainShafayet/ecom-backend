@@ -1233,6 +1233,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/coupons/available/:
+    get:
+      operationId: coupons_available_retrieve
+      description: 'Only coupons the staff ticked *show at checkout* and that can
+        be used right now (switched on, inside their dates, uses left), at most 5:
+        the ones usable now first, then the biggest saving. `eligible` is false while
+        `subtotal` is below `min_order_amount`, and `amount_short` is what is missing.
+        Secret codes are never listed, and a per-customer limit is only checked once
+        the phone number is given to `POST /coupons/validate/`. The answer is a hint:
+        `POST /orders/` decides, always.'
+      summary: The coupons suggested at checkout, for a cart's subtotal (guests too)
+      parameters:
+      - in: query
+        name: subtotal
+        schema:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: 0
+          exclusiveMaximum: true
+          default: 0.00
+      tags:
+      - coupons
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/CouponOffers'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/coupons/validate/:
     post:
       operationId: coupons_validate_create
@@ -3143,6 +3198,74 @@ components:
       - media_type
       - order
       - type
+    CouponOffer:
+      type: object
+      description: One coupon the shop suggests at checkout (`GET /coupons/available/`).
+      properties:
+        code:
+          type: string
+        public_title:
+          type: string
+          description: What the customer reads, e.g. '25% off your first order'.
+        discount_type:
+          $ref: '#/components/schemas/DiscountTypeEnum'
+        discount_value:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: A percentage (0-100) or a fixed amount, by discount_type.
+        min_order_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: 'Null: no minimum.'
+        max_discount_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: 'Null: no cap.'
+        eligible:
+          type: boolean
+          description: True when the subtotal already reaches min_order_amount.
+        amount_short:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: What the cart still needs to reach min_order_amount; 0 when
+            eligible.
+      required:
+      - amount_short
+      - code
+      - discount_type
+      - discount_value
+      - eligible
+      - max_discount_amount
+      - min_order_amount
+      - public_title
+    CouponOffers:
+      type: object
+      description: What `GET /coupons/available/` answers.
+      properties:
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CouponOffer'
+      required:
+      - offers
     CouponPreview:
       type: object
       description: What `POST /coupons/validate/` answers.
@@ -3235,6 +3358,14 @@ components:
       - depth
       - height
       - width
+    DiscountTypeEnum:
+      enum:
+      - percentage
+      - fixed
+      type: string
+      description: |-
+        * `percentage` - Percentage
+        * `fixed` - Fixed amount
     EditReviewRequest:
       type: object
       description: 'The multipart body of PUT: every field is optional, and `product_id`
