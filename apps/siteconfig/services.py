@@ -1,4 +1,8 @@
 """What `/site/…` answers. Reading never writes: a shop that has not saved its settings yet answers with the defaults."""
+import math
+
+from django.utils import timezone
+
 from apps.core.utils import absolute_url
 
 from .models import FaqItem, NewsletterSubscriber, SiteSettings, SocialLink, StaticPage, TrustBadge
@@ -13,19 +17,31 @@ def footer_pages():
     return groups
 
 
-def site_payload(request=None):
+def announcement(site, now):
+    """`{text, link, ends_in_seconds}`, or `None` when there is no bar: switched off, no text, or its end has passed (the end moment
+    itself is already over). The seconds are measured here so a wrong clock on the customer's phone does not matter."""
+    text = site.announcement_text.strip()
+    if not site.announcement_enabled or not text:
+        return None
+    ends_at = site.announcement_ends_at
+    if ends_at is not None and now >= ends_at:
+        return None
+    return {
+        "text": text,
+        "link": site.announcement_link or None,
+        "ends_in_seconds": None if ends_at is None else math.ceil((ends_at - now).total_seconds()),
+    }
+
+
+def site_payload(request=None, now=None):
     site = SiteSettings.current()
     links = SocialLink.objects.filter(site=site, is_active=True) if site.pk else SocialLink.objects.none()
     badges = TrustBadge.objects.filter(site=site, is_active=True) if site.pk else TrustBadge.objects.none()
-    text = site.announcement_text.strip()
-    announcement = (
-        {"text": text, "link": site.announcement_link or None} if site.announcement_enabled and text else None
-    )
     return {
         "name": site.site_name,
         "tagline": site.tagline,
         "logo": absolute_url(request, site.logo),
-        "announcement": announcement,
+        "announcement": announcement(site, now or timezone.now()),
         "contact": {
             "email": site.contact_email,
             "phone": site.contact_phone,

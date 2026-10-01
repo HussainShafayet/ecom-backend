@@ -485,7 +485,7 @@ app (`apps/siteconfig`) never imports the catalog, so a template base can take i
   {"site": {
     "name": "GoCart", "tagline": "Everyday things, delivered",
     "logo": "http://host/media/site/ab12.png",
-    "announcement": {"text": "Flash Sale!", "link": "/products/flash-sale"},
+    "announcement": {"text": "Flash Sale!", "link": "/products/flash-sale", "ends_in_seconds": 86400},
     "contact": {"email": "", "phone": "", "address": "", "opening_hours": "", "map_url": ""},
     "social_links": [{"platform": "facebook", "url": "https://..."}],
     "trust_badges": [{"icon": "delivery", "title": "Free delivery", "subtitle": ""}],
@@ -494,8 +494,12 @@ app (`apps/siteconfig`) never imports the catalog, so a template base can take i
   ```
 
   - `logo` is an absolute URL, or `null`: the storefront then uses the logo that ships with it.
-  - `announcement` is `null` unless the admin switched the bar on and wrote a text. `link` is a path of the shop
+  - `announcement` is `null` unless the admin switched the bar on and wrote a text, and it is `null` again once the
+    optional end the admin set (`announcement_ends_at`) has passed. `link` is a path of the shop
     (`/products/flash-sale`), an `https://…` address, or `null` (plain text). Never `javascript:` or `//host`.
+    `ends_in_seconds` is how long the bar has left (measured by the server, so the customer's own clock does not matter;
+    rounded up, so at least 1) or `null` when no end was set. `/site/` is read once when the storefront opens, so a tab
+    that stays open should hide the bar itself when those seconds run out.
   - `contact` strings are `""` when not set; `map_url` is the `src` of an embedded Google or OpenStreetMap map (nothing
     else is accepted), for an `<iframe>`.
   - `social_links` are the active ones in the admin's order. `platform` is one of `facebook, instagram, x, youtube,

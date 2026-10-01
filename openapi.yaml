@@ -2883,7 +2883,13 @@ components:
           nullable: true
           description: A page of the shop (/products/flash-sale), https://..., or
             null.
+        ends_in_seconds:
+          type: integer
+          nullable: true
+          description: 'Seconds until the bar should disappear, measured by the server
+            (rounded up, at least 1); null: no end was set.'
       required:
+      - ends_in_seconds
       - link
       - text
     BlankEnum:

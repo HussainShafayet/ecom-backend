@@ -8,6 +8,10 @@ from .models import ContactMessage, SocialLink, StaticPage, TrustBadge
 class AnnouncementSerializer(serializers.Serializer):
     text = serializers.CharField()
     link = serializers.CharField(allow_null=True, help_text="A page of the shop (/products/flash-sale), https://..., or null.")
+    ends_in_seconds = serializers.IntegerField(
+        allow_null=True,
+        help_text="Seconds until the bar should disappear, measured by the server (rounded up, at least 1); null: no end was set.",
+    )
 
 
 class ContactDetailsSerializer(serializers.Serializer):

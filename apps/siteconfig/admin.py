@@ -24,7 +24,7 @@ class SiteSettingsAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("Shop", {"fields": ("site_name", "tagline", "logo")}),
-        ("Announcement bar", {"fields": ("announcement_enabled", "announcement_text", "announcement_link")}),
+        ("Announcement bar", {"fields": ("announcement_enabled", "announcement_text", "announcement_link", "announcement_ends_at")}),
         ("Contact details", {"fields": ("contact_email", "contact_phone", "contact_address", "opening_hours", "map_embed_url")}),
     )
     inlines = (SocialLinkInline, TrustBadgeInline)
