@@ -47,6 +47,37 @@ class ReviewSerializer(serializers.ModelSerializer):
         return bool(user and user.is_authenticated and review.user_id == user.pk)
 
 
+class FeaturedReviewSerializer(serializers.ModelSerializer):
+    """One review as the homepage shows it: who (a short name), what they said, and what they bought."""
+
+    reviewer = serializers.SerializerMethodField(help_text="'Rahim U.': first name and the initial of the last; 'Customer' without a name.")
+    verified = serializers.SerializerMethodField(help_text="True when the review came from a delivered purchase.")
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_slug = serializers.CharField(source="product.slug", read_only=True)
+    image = serializers.SerializerMethodField(help_text="The first photo of the review (absolute URL), else null.")
+
+    class Meta:
+        model = Review
+        fields = ("id", "reviewer", "rating", "comment", "created_at", "verified", "product_name", "product_slug", "image")
+
+    def get_reviewer(self, review) -> str:
+        return services.short_name(review.user)
+
+    def get_verified(self, review) -> bool:
+        return review.order_item_id is not None
+
+    @extend_schema_field(OpenApiTypes.URI)
+    def get_image(self, review):
+        photo = next((media for media in review.media.all() if not media.is_video), None)  # prefetched: no query
+        return absolute_url(self.context.get("request"), photo.file) if photo else None
+
+
+class FeaturedReviewsSerializer(serializers.Serializer):
+    """What `GET /products/reviews/featured/` answers."""
+
+    reviews = FeaturedReviewSerializer(many=True)
+
+
 class ReviewQuerySerializer(serializers.Serializer):
     product_id = serializers.IntegerField(min_value=1)
 

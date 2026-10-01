@@ -19,6 +19,7 @@ from django.conf import settings
 from django.core.files.storage import default_storage
 from django.db import transaction
 from django.db.models import Count, Sum
+from django.db.models.functions import Length
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.catalog.models import Product
@@ -36,6 +37,16 @@ def display_name(user):
     return user.name.strip() or "Customer"
 
 
+def short_name(user):
+    """How a reviewer is named on the homepage, where strangers read it: "Rahim U." (first name, initial of the last),
+    one word as it is, "Customer" without a name. Never the phone number or the e-mail address."""
+    parts = user.name.split()
+    if not parts:
+        return "Customer"
+    first = parts[0][:30]
+    return first if len(parts) == 1 else f"{first} {parts[-1][0].upper()}."
+
+
 # --- reading ----------------------------------------------------------------------------------------------------
 def shown_reviews(product_id):
     """The reviews of a product the shop shows, newest first."""
@@ -44,6 +55,40 @@ def shown_reviews(product_id):
         .select_related("user")
         .prefetch_related("media")
     )
+
+
+MAX_FEATURED = 8  # a row to swipe on a phone, not the whole shelf
+AUTO_MIN_RATING = 4
+AUTO_MIN_COMMENT = 40  # characters: "Nice." says nothing to a stranger
+
+
+def featured_reviews():
+    """The reviews for the homepage, at most `MAX_FEATURED`: the ones the staff ticked (`show_on_homepage`) if any of
+    them can be shown, newest first; else the shop picks (approved, 4-5 stars, a comment of at least `AUTO_MIN_COMMENT`
+    characters, a delivered purchase, one per customer, the best rating first, then the newest). A review of a hidden
+    product, or one the staff hid, is never shown, ticked or not."""
+    shown = (
+        Review.objects.filter(is_approved=True, product__is_active=True)
+        .select_related("user", "product")
+        .prefetch_related("media")
+    )
+    chosen = list(shown.filter(show_on_homepage=True)[:MAX_FEATURED])  # Review.Meta.ordering: newest first
+    if chosen:
+        return chosen
+    candidates = (
+        shown.filter(rating__gte=AUTO_MIN_RATING, order_item__isnull=False)
+        .annotate(comment_length=Length("comment"))
+        .filter(comment_length__gte=AUTO_MIN_COMMENT)
+        .order_by("-rating", "-created_at", "-id")
+    )
+    picked, customers = [], set()
+    for review in candidates[: MAX_FEATURED * 10]:  # enough to skip a few customers who wrote many
+        if review.user_id not in customers:
+            customers.add(review.user_id)
+            picked.append(review)
+            if len(picked) == MAX_FEATURED:
+                break
+    return picked
 
 
 def delivered_items(user, product_id):

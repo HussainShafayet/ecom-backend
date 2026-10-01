@@ -431,6 +431,16 @@ Orders placed before the payments app existed get their payment from a data migr
   `product_id` may only repeat the review's own. Only the author: someone else's review, a hidden one, or an unknown
   id is a `404`. **New files are added to the review's media** (5 in all, existing ones count); text values under `media`
   (the frontend re-sends the existing media objects as `"[object Object]"`) are ignored, so an edit never removes media.
+- `GET /products/reviews/featured/` → `200`, `data: {reviews: [FeaturedReview]}`: what customers say, for the shop's
+  homepage. Public, no token needed (a stale one is not a 401). At most **8**. The reviews the staff ticked **Show on
+  homepage** (Admin > Reviews), newest first, when any of them can be shown; otherwise the shop's own pick: approved,
+  4-5 stars, a comment of at least 40 characters, from a delivered purchase, one per customer, the best rating first
+  then the newest. A review the staff hid, or one of a hidden product, is never listed, ticked or not. An empty list
+  means the shop has nothing to show yet (the storefront then draws nothing).
+  `FeaturedReview = {id, reviewer, rating, comment, created_at, verified, product_name, product_slug, image}`:
+  `reviewer` is a short name (`"Rahim U."`: first name and the initial of the last; `"Customer"` without a name),
+  never a phone number or an e-mail address; `verified` is true when the review came from a delivered purchase;
+  `product_slug` is for `/products/detail/<slug>`; `image` is the absolute URL of the review's first photo, else `null`.
 - `Review = {id, product_id, user_name, rating, comment, created_at, can_edited, media_urls:[{file, type}]}`.
   `user_name` is the author's name (`"Customer"` if empty), never their phone number or e-mail. `can_edited` is true for
   the signed-in author. `media_urls[].file` is an absolute URL whose extension matches the file's real type

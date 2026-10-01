@@ -64,11 +64,11 @@ def test_staff_can_not_add_a_review(admin_client):
     assert admin_client.get(reverse("admin:reviews_review_add")).status_code == 403
 
 
-def test_the_text_and_rating_are_read_only_only_approval_is_editable(admin_client, product):
+def test_the_text_and_rating_are_read_only_only_approval_and_the_homepage_tick_are_editable(admin_client, product):
     review = review_by(other_customer(1), product, 4, "Original")
 
     page = admin_client.get(change_url(review)).content.decode()
-    assert 'name="is_approved"' in page
+    assert 'name="is_approved"' in page and 'name="show_on_homepage"' in page
     for field in ("rating", "comment", "product", "user"):
         assert f'name="{field}"' not in page
 
@@ -110,6 +110,39 @@ def test_the_hide_and_show_actions_recount_every_product_they_touch(admin_client
 
     admin_client.post(LIST_URL, {"action": "show", "_selected_action": ids})
     assert rating_of(mug) == (2, 3.0) and rating_of(plate) == (1, 2.0)
+
+
+def test_the_homepage_tick_is_on_the_list_the_filter_and_the_form(admin_client, product):
+    ticked = review_by(other_customer(1), product, 5, "Ticked one", show_on_homepage=True)
+    review_by(other_customer(2), product, 5, "Plain one")
+
+    html = admin_client.get(LIST_URL).content.decode()
+    assert 'name="form-0-show_on_homepage"' in html  # a column that can be ticked in the list itself
+    only = admin_client.get(LIST_URL, {"show_on_homepage__exact": "1"}).content.decode()
+    assert "Ticked one" in only and "Plain one" not in only
+
+    inlines = {"media-TOTAL_FORMS": "0", "media-INITIAL_FORMS": "0", "media-MIN_NUM_FORMS": "0", "media-MAX_NUM_FORMS": "0"}
+    admin_client.post(change_url(ticked), {"is_approved": "on", **inlines})  # the box is unticked
+    ticked.refresh_from_db()
+    assert ticked.show_on_homepage is False
+    admin_client.post(change_url(ticked), {"is_approved": "on", "show_on_homepage": "on", **inlines})
+    ticked.refresh_from_db()
+    assert ticked.show_on_homepage is True
+
+
+def test_the_homepage_actions_tick_and_untick_the_selected_reviews(admin_client, product):
+    reviewers(3, product, [5, 4, 3])
+    ids = [str(pk) for pk in Review.objects.filter(rating__gte=4).values_list("pk", flat=True)]
+
+    response = admin_client.post(LIST_URL, {"action": "feature", "_selected_action": ids}, follow=True)
+
+    assert "2 review(s) will be shown on the homepage." in [str(m) for m in response.context["messages"]]
+    assert set(map(str, Review.objects.filter(show_on_homepage=True).values_list("pk", flat=True))) == set(ids)
+    assert rating_of(product) == (3, 4.0)  # nothing about the rating moved
+
+    response = admin_client.post(LIST_URL, {"action": "unfeature", "_selected_action": ids}, follow=True)
+    assert "2 review(s) removed from the homepage." in [str(m) for m in response.context["messages"]]
+    assert not Review.objects.filter(show_on_homepage=True).exists()
 
 
 def test_deleting_from_the_admin_recounts(admin_client, product):

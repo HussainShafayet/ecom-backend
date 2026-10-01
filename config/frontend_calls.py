@@ -70,6 +70,7 @@ FRONTEND_CALLS = [
     ("PUT", "/accounts/favourite/"),
     # reviews (redux/slice/reviewSlice.js)
     ("GET", "products/reviews/"),
+    ("GET", "products/reviews/featured/"),
     ("POST", "products/reviews/"),
     ("PUT", "products/reviews/{id}/"),
 ]

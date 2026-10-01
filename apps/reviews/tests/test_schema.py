@@ -4,6 +4,7 @@ from django.core.management import call_command
 
 REVIEWS = "/api/v1/products/reviews/"
 ONE = "/api/v1/products/reviews/{id}/"
+FEATURED = "/api/v1/products/reviews/featured/"
 
 
 @pytest.fixture
@@ -68,3 +69,12 @@ def test_editing_makes_every_field_optional(schema):
     request = component(schema, body)
     assert set(request["properties"]) == {"product_id", "rating", "comment", "media"}
     assert not request.get("required")
+
+
+def test_the_homepage_reviews_are_documented_and_public(schema):
+    assert set(schema["paths"][FEATURED]) == {"get"}
+    assert "security" not in schema["paths"][FEATURED]["get"]  # no token is read at all (auth=[]), like the offers list
+    featured = component(schema, "FeaturedReview")
+    assert set(featured["properties"]) == {
+        "id", "reviewer", "rating", "comment", "created_at", "verified", "product_name", "product_slug", "image",
+    }

@@ -6,5 +6,6 @@ from . import views
 
 urlpatterns = [
     *dual_path("products/reviews/", views.ReviewListCreateView.as_view(), name="review-list"),
+    *dual_path("products/reviews/featured/", views.FeaturedReviewsView.as_view(), name="review-featured"),
     *dual_path("products/reviews/<int:pk>/", views.ReviewDetailView.as_view(), name="review-detail"),
 ]
