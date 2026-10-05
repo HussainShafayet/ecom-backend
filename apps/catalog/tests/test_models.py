@@ -340,3 +340,13 @@ def test_deleting_a_product_deletes_its_variants():
     make_variant(product)
     product.delete()
     assert ProductVariant.objects.count() == 0
+
+
+def test_a_variant_counts_no_damaged_units_to_begin_with_and_the_admin_never_lets_it_be_typed():
+    from apps.catalog.admin import ProductVariantInline
+
+    variant = make_variant(make_product("Mug"))
+
+    assert variant.damaged_quantity == 0  # moved only by orders.services.take_back_stock, when a damaged return is received
+    assert "damaged_quantity" in ProductVariantInline.readonly_fields
+    assert "damaged_quantity" in ProductVariantInline.fields

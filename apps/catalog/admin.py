@@ -89,7 +89,8 @@ class ProductVariantFormSet(BaseInlineFormSet):
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     formset = ProductVariantFormSet
-    fields = ("color", "size", "sku", "base_price", "discount_price", "stock_quantity", "is_default", "is_active")
+    fields = ("color", "size", "sku", "base_price", "discount_price", "stock_quantity", "damaged_quantity", "is_default", "is_active")
+    readonly_fields = ("damaged_quantity",)  # counted when a damaged return is received, never typed
     autocomplete_fields = ("color", "size")
     extra = 0
     min_num = 1

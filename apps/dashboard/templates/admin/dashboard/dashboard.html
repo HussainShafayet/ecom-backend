@@ -20,16 +20,51 @@
   <div class="module">
     <h2>Revenue</h2>
     <table>
-      <tr><th>Today</th><th>This week</th><th>This month</th><th>All time</th></tr>
+      <tr><th></th><th>Today</th><th>This week</th><th>This month</th><th>All time</th></tr>
       <tr>
+        <th>Revenue</th>
         <td>{{ revenue.today }}</td>
         <td>{{ revenue.week }}</td>
         <td>{{ revenue.month }}</td>
         <td>{{ revenue.all }}</td>
       </tr>
+      <tr>
+        <th>Refunded for returns</th>
+        <td>{{ refunds.today }}</td>
+        <td>{{ refunds.week }}</td>
+        <td>{{ refunds.month }}</td>
+        <td>{{ refunds.all }}</td>
+      </tr>
+      <tr>
+        <th>Net revenue</th>
+        <td><strong>{{ net_revenue.today }}</strong></td>
+        <td><strong>{{ net_revenue.week }}</strong></td>
+        <td><strong>{{ net_revenue.month }}</strong></td>
+        <td><strong>{{ net_revenue.all }}</strong></td>
+      </tr>
     </table>
-    <p class="help">Sum of paid payments (cash collected on delivery), bucketed by when each was paid. A later refund
-      drops back out of the figure it once counted toward.</p>
+    <p class="help">Revenue is the sum of paid payments (cash collected on delivery), bucketed by when each was paid. A later
+      refund of a whole order drops back out of the figure it once counted toward. Refunded for returns is the money paid
+      back on completed return requests, bucketed by when it was completed (not counted again for an order that was
+      also marked refunded). Net revenue is revenue less that.</p>
+  </div>
+
+  <div class="module">
+    <h2>Returns &mdash; {{ period_label|lower }}</h2>
+    <table>
+      <thead><tr><th>Received</th><th>Units back on the shelf</th><th>Units damaged</th><th>Paid back</th><th>Courier paid by the shop</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>{{ returns.received }}</td>
+          <td>{{ returns.restocked_units }}</td>
+          <td>{{ returns.damaged_units }}</td>
+          <td>{{ returns.refunded }}</td>
+          <td>{{ returns.shop_courier_cost }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="help">Return requests whose goods came back. Damaged units are counted, never added to the stock. The courier cost is
+      what the customer did not pay of it (a free return for a fault of the shop, or a waived charge): it comes out of the shop's profit.</p>
   </div>
 
   <div class="module">

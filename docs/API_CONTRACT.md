@@ -398,11 +398,11 @@ Orders placed before the payments app existed get their payment from a data migr
   the order is `pending`, `confirmed`, `paid` or `shipped` and the shop made an estimate when it was placed, else `null`
   (also once it is delivered, cancelled, returned or refunded). `discount_amount` is `0` and `coupon_code` is `""` when no coupon was
   used. `payment` is `{method, method_display, status, status_display, amount, paid_at, refunded_at}` or
-  `null` (the payment of section 6, newest one). `history` is every status the order has been in, oldest first:
+  `null` (the payment of section 6, newest one). `returns` is the return block below. `history` is every status the order has been in, oldest first:
   `[{status, status_display, created_at}]` (who moved it and the staff's note are not shown). `can_cancel` is true
   while the order is `pending`. Somebody else's order, a guest order and an unknown number are the same `404`.
-- `Item = {product_id, variant_id, product_slug, product_name, variant_label, sku, unit_price, base_price, quantity,
-  line_total, image}`: the snapshot of what was bought and paid; `product_id` and `product_slug` are `null` once the
+- `Item = {id, product_id, variant_id, product_slug, product_name, variant_label, sku, unit_price, base_price, quantity,
+  line_total, image}`: the snapshot of what was bought and paid; `id` names the line when part of the order is returned (below); `product_id` and `product_slug` are `null` once the
   product was deleted, `variant_id` once the variant was (`product_id` + `variant_id` are what a cart takes, so an order
   can be bought again), `image` is the product's current main image (absolute URL) or `null`.
 - `POST /orders/{order_id}/cancel/` (no body) → `200`, `data: Order` (now `cancelled`). Only a **pending** order: the
@@ -410,6 +410,53 @@ Orders placed before the payments app existed get their payment from a data migr
   as the staff's. Any other status is a `400` (`Only a pending order can be cancelled. To change an order that is
   already being handled, please contact us.`); somebody else's order is a `404`. Two clicks at once cancel it once.
   Shares the `order` throttle scope with placing orders.
+- **Return requests** (`apps/returns`; the shop's policy is Admin > Returns > Return settings: `enabled` (default on), `window_days`
+  (default 7, counted from the day the order was delivered, that last day included) and `charge_return_delivery` (default on)). Only
+  the customer's own **delivered** order can be returned, and only while that window is open; units that an earlier request holds
+  (`requested`, `approved`, `received` or `completed`) are not free, a `rejected` or `cancelled` request lets go of them. The order
+  never changes: a request is not an order status, and the shop pays the money back by hand (cash on delivery has no card to credit).
+  - **What sending it back costs.** The courier cost of a return is the order's own delivery charge. When the reason is the shop's
+    fault (`damaged`, `wrong_item`, `not_as_described`) the return is **free**: `return_charge` is `0` and the shop pays the courier
+    out of its profit. For the customer's own reason (`size_fit`, `changed_mind`, `other`) the customer pays it: `return_charge` is
+    the delivery charge, taken off the refund. `charge_return_delivery` off makes every return free. Staff may waive or change the charge
+    of one request (the refund then moves with it). Fixed when the request is made: a later change of the delivery charges or of the policy
+    never rewrites an old request. `refund_amount = goods_amount - return_charge` (never below `0`); `goods_amount` is the price of the
+    returned lines less their share of the order's coupon (delivery is not part of it). What the courier costs the shop is shown to
+    staff, never in this API.
+  - `GET /orders/{order_id}/` gains `returns` = `{can_request, message, until, return_charge, reasons, items, requests}`:
+    `can_request` is true when something may be asked for now; `message` says why a **delivered** order can not be
+    returned (`The shop is not taking return requests right now.`, `The time to return this order ended on 12 Oct 2026.`,
+    `Everything in this order is already in a return request.`), else `null`; `until` is the last day to ask (a date, delivered
+    orders only, `null` when returns are off); `return_charge` is what a reason that is not free costs the customer (the order's delivery
+    charge; `0` when the shop charges nothing); `reasons` is `[{value, label, free}]` (`damaged, wrong_item, not_as_described,
+    size_fit, changed_mind, other`; `free` says the return costs nothing for that reason); `items` is `[{item_id, quantity}]`, the lines
+    and units still free (empty unless `can_request`); `requests` is the customer's requests for this order, newest first: `{id, status,
+    status_display, reason, reason_display, details, response, goods_amount, return_charge, refund_amount, created_at, updated_at, items:
+    [{item_id, product_name, variant_label, unit_price, quantity}]}`. `status` is `requested | approved | received | rejected | completed
+    | cancelled`; `response` is the shop's message (how to send the goods back, or why not), `""` until it writes one; `refund_amount` is
+    an estimate until the request is `completed`. `returns` is `null` when the returns app is not installed, and is not part of the list
+    of orders or of the guest's tracking.
+  - `POST /orders/{order_id}/returns/` `{reason, details?, items: [{item_id, quantity}]}` → `201`, `data: Order` (with the new
+    request in `returns.requests`). `item_id` is `items[].id` of the order; each line once; `details` (at most 500 characters)
+    is required for the reason `other` (`400`, `field_errors.details`). Every other problem is a `400` with the sentences in
+    `errors` and nothing written: not delivered (`Only a delivered order can be returned.`), the window, returns off,
+    `One of those items is not in this order.`, `Only 1 of Mug (Default) can still be returned.`, `… is already in a return
+    request.`. Somebody else's order and a guest order are a `404`. Two taps at once ask once. Shares the `order` throttle scope.
+  - `POST /orders/{order_id}/returns/{id}/cancel/` (no body) → `200`, `data: Order`. Only while the request is `requested`
+    (the shop has not answered); then its units are free again. Any other status is a `400` (`Only a request the shop has not
+    answered yet can be cancelled. Please contact us.`); somebody else's order or an unknown request is a `404`.
+  - **The shop answers in the admin** (Returns > Return requests; Order Managers may). The flow is in `apps/returns/state.py`:
+    `requested -> approved | rejected | cancelled`, `approved -> received | cancelled`, `received -> completed`. *Approve* (with a message:
+    how to send the goods back), *reject* (with the reason), **receive the goods** (staff enter, per line, how many units came back fine
+    and how many damaged, then set the status to Received, or use *Goods received, all in good condition*), and *mark completed* once the
+    money is paid back. **Receiving moves the inventory, once:** the fine units go back on the shelf (`ProductVariant.stock_quantity`),
+    the damaged ones are only counted (`ProductVariant.damaged_quantity`, read-only in the admin, never sellable), and units of a variant
+    that was deleted from the catalog are recorded on the request but have no stock to go back to. The order's status, its payment and
+    `Product.total_orders` do not change (the sale happened). Nothing can be cancelled after the goods are received.
+  - The dashboard (Admin > Dashboard, Owner only) shows *Refunded for returns* (completed requests, by their completion date, not for an
+    order that was also marked refunded) and *Net revenue* (revenue less that), and a *Returns* block: received requests, units back on the
+    shelf, units damaged, the courier cost the shop paid itself (`courier_cost - return_charge`). The customer is not messaged yet (no
+    notification event for it); they see the answer on their order.
 - `GET /orders/track/?order_id=GC-…&phone_number=+880…` (**public**, no token needed; a stale token is ignored) →
   `data: Order summary` + `subtotal, delivery_charge, discount_amount, coupon_code, payment, history, expected_delivery`, and **nothing
   about who the order is for or where it goes** (no name, e-mail, phone or address): an order number is easy to guess, the phone number is the only

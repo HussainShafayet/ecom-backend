@@ -41,7 +41,7 @@ Every push/PR to `main` runs `pytest` + schema validation in GitHub Actions (`.g
 
 `config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` ·
 `scripts/` (`e2e_smoke.py`, `backup.sh`) · `.github/workflows/ci.yml` ·
-`apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews,notifications,coupons,dashboard}` (built step by step) ·
+`apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews,notifications,coupons,returns,dashboard}` (built step by step) ·
 `docs/API_CONTRACT.md` · `docs/ROADMAP.md` (what's built vs. still missing, priority order) · `openapi.yaml`
 
 ## API contract
@@ -56,7 +56,7 @@ schema together, and never diverge from what the frontend calls without the user
   `api_response(data, message=...)`; never hand-build the envelope (renderer + `envelope_exception_handler` do it).
 - Money: `DecimalField(12, 2)` and `apps/core/money.py` only, never `float`. On the wire money is a JSON number
   (`COERCE_DECIMAL_TO_STRING=False`), because the frontend does arithmetic and `.toFixed()` on it.
-- Stock/orders: only through `orders.services.place_order()` inside `transaction.atomic()` with `select_for_update()`
+- Stock/orders: only through `orders.services.place_order()` (and `take_back_stock()` for goods a customer sent back) inside `transaction.atomic()` with `select_for_update()`
   (lock variants in id order, then products, then the day's order counter). Order status changes only through
   `orders.services.change_status()`, which checks the transition map in `orders/state.py` and always writes
   `OrderStatusHistory`. Prices are always recomputed from the database, never taken from the request.
@@ -95,6 +95,24 @@ schema together, and never diverge from what the frontend calls without the user
   `GET /coupons/available/` (scope `coupon_offers`) suggests the coupons flagged `show_at_checkout` (which need a
   `public_title`) that can be used right now; `services.available_offers()` asks `_eligibility_problem` itself, so the list can
   never disagree with `validate`, and it is a hint only (`eligible` / `amount_short` are for drawing, `POST /orders/` decides).
+- Returns: `apps/returns` (depends on `orders`, never the other way round: `orders` shows the customer's `returns` block through
+  `orders.hooks.returns_info`, which the returns app registers in `ready()`, like the payments block). A `ReturnRequest` is NOT an order status:
+  it holds lines and units of a DELIVERED order (`ReturnItem`), opened only by `services.request_return()` (the order row locked, so two taps
+  can not both take the last unit) and moved only by `services.change_status` / `staff_update` / `receive_goods` through `state.py`
+  (`requested -> approved | rejected | cancelled`, `approved -> received | cancelled`, `received -> completed`). Units held = requested, approved,
+  received and completed requests (`state.HOLDING`); a rejected or cancelled one frees them. The window and the return charge are `ReturnSettings`
+  (one admin row, Owner only; defaults 7 days after the delivery history row, `enabled` on, `charge_return_delivery` on; reading never writes).
+  Money per request, all snapshots: `goods_amount` (lines less their coupon share), `courier_cost` (the order's delivery charge), `return_charge`
+  (what the customer pays of it: 0 for the shop's own fault, `ReturnRequest.FREE_REASONS`, or when the policy charges nothing; staff may waive it),
+  `refund_amount = goods - charge` (a new charge moves it, staff may type another figure until the request is rejected, completed or cancelled),
+  `shop_cost = courier_cost - return_charge` (the courier the shop pays out of its profit; never in the API). **Inventory:** `receive_goods()` is the
+  only place the stock moves for a return: under the request's row lock it records per line the units that came back fine (`good_quantity`, put back on
+  the shelf) and damaged (`damaged_quantity`, only counted in `ProductVariant.damaged_quantity`, never sellable) through
+  `orders.services.take_back_stock()` (variants locked in pk order like every other stock writer), once. It never touches the order, a payment or
+  `total_orders`; the money is paid back by hand. Staff enter the numbers in the request's inline (editable only while `approved`; saved when the
+  status is set to Received by `ReturnRequestAdmin.save_related`). The dashboard subtracts completed refunds in its own line ("Net revenue") and shows
+  the shop-paid courier and the damaged units. The customer sees `response` (the shop's message). Order Manager may view/change requests and their
+  lines (`setup_roles`); add/delete stay blocked.
 - Flash sale: products and categories are marked `is_flash_sale` in the catalog; the optional **window** that says when the
   mark counts is `catalog.FlashSale` (one row, `starts_at` / `ends_at`; none set = the mark counts always, as before).
   `catalog/flash_sale.py` (`flash_sale_state`, `is_live`) is the only code that reads it: `FlashSaleProductsView` adds

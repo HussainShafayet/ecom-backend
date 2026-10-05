@@ -10,9 +10,18 @@ self-correcting: a payment that was collected and later refunded automatically d
 the next time the page loads, with no separate "subtract refunds" step. This means a past period's total can shift
 if something in it is refunded later — that is intentional: the dashboard always shows real money currently held,
 not a frozen historical figure.
+
+Returns (apps/returns) are subtracted in their own line, not folded into revenue: "Refunded for returns" is the `refund_amount` of the
+requests that are COMPLETED (the money was paid back), bucketed by `completed_at`, and "Net revenue" is revenue less that. Only requests of an
+order whose payment is still PAID count: if staff also mark the whole order refunded its payment is already out of revenue, and its return
+refund must not be taken off a second time. The courier cost the shop itself pays for returns (`courier_cost - return_charge`, bucketed by
+`received_at`) is shown apart: with no cost price on a product there is no profit to take it from yet.
 """
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Sum
+from django.db.models import Count, DecimalField, Exists, F, OuterRef, Sum, Value
+from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from apps.catalog.models import Product, ProductVariant
@@ -20,6 +29,7 @@ from apps.coupons.models import Coupon
 from apps.core.money import ZERO
 from apps.orders.models import Order, OrderItem
 from apps.payments.models import Payment
+from apps.returns.models import ReturnItem, ReturnRequest
 
 User = get_user_model()
 
@@ -56,6 +66,37 @@ def _revenue_since(start_date):
     if start_date is not None:
         qs = qs.filter(paid_at__date__gte=start_date)
     return qs.aggregate(total=Sum("amount"))["total"] or ZERO
+
+
+def refund_summary():
+    """Today / this week / this month / all-time money paid back for returns, the same buckets as `revenue_summary`."""
+    today = timezone.localdate()
+    return {period: _refunds_since(_period_start(period, today)) for period in ("today", "week", "month", "all")}
+
+
+def _refunds_since(start_date):
+    paid = Payment.objects.filter(order=OuterRef("order"), status=Payment.Status.PAID)
+    qs = ReturnRequest.objects.filter(status=ReturnRequest.Status.COMPLETED).filter(Exists(paid))
+    if start_date is not None:
+        qs = qs.filter(completed_at__date__gte=start_date)
+    return qs.aggregate(total=Sum("refund_amount"))["total"] or ZERO
+
+
+def returns_summary(start_date):
+    """Returns whose goods came back since `start_date` (None for all-time): how many, how many units went back on the shelf and how many were
+    damaged, and the courier cost the shop paid itself (what the customer did not pay of it). Plus the money paid back, see `refund_summary`."""
+    received = ReturnRequest.objects.filter(status__in=(ReturnRequest.Status.RECEIVED, ReturnRequest.Status.COMPLETED))
+    if start_date is not None:
+        received = received.filter(received_at__date__gte=start_date)
+    shop_cost = Greatest(F("courier_cost") - F("return_charge"), Value(ZERO), output_field=DecimalField(max_digits=12, decimal_places=2))
+    units = ReturnItem.objects.filter(request__in=received).aggregate(good=Sum("good_quantity"), damaged=Sum("damaged_quantity"))
+    return {
+        "received": received.count(),
+        "restocked_units": units["good"] or 0,
+        "damaged_units": units["damaged"] or 0,
+        "shop_courier_cost": received.aggregate(total=Sum(shop_cost))["total"] or ZERO,
+        "refunded": _refunds_since(start_date),
+    }
 
 
 def order_status_counts():
@@ -127,11 +168,15 @@ def dashboard_context(period, low_stock_threshold):
         period = "month"
     today = timezone.localdate()
     start_date = _period_start(period, today)
+    revenue, refunds = revenue_summary(), refund_summary()
     return {
         "period": period,
         "period_label": PERIOD_LABELS[period],
         "periods": PERIOD_LABELS.items(),
-        "revenue": revenue_summary(),
+        "revenue": revenue,
+        "refunds": refunds,
+        "net_revenue": {key: revenue[key] - refunds[key] for key in revenue},
+        "returns": returns_summary(start_date),
         "status_counts": order_status_counts(),
         "low_stock": low_stock_variants(low_stock_threshold),
         "low_stock_threshold": low_stock_threshold,

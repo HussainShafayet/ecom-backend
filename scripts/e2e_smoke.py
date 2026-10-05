@@ -446,6 +446,26 @@ def main():
            and [h["status"] for h in body["data"]["history"]] == ["pending", "shipped", "delivered"], body)
         status, body, _ = api.call("POST", "/orders/{number}/cancel/", token=access, number=order.number)
         ok("a delivered order can not be cancelled -> 400", status == 400, body)
+
+        # the customer changes their mind about a delivered order: ask to send a line back, then call the request off
+        status, body, _ = api.call("GET", "/orders/{number}/", token=access, number=order.number)
+        returns = (body.get("data") or {}).get("returns") or {}
+        ok("a delivered order offers its lines for return, with the reasons and the last day to ask",
+           status == 200 and returns.get("can_request") is True and len(returns["items"]) == 2 and bool(returns["until"]) and bool(returns["reasons"]), returns)
+        free = returns["items"][0] if returns.get("items") else {"item_id": 0, "quantity": 1}
+        status, body, _ = api.call("POST", "/orders/{number}/returns/", token=access, number=order.number,
+                                   body={"reason": "damaged", "details": "Arrived broken", "items": [{"item_id": free["item_id"], "quantity": 1}]})
+        asked = (((body.get("data") or {}).get("returns") or {}).get("requests") or [{}])[0]
+        ok("POST /orders/{number}/returns/ -> 201, the request waits for the shop and the order stays delivered",
+           status == 201 and asked.get("status") == "requested" and asked.get("refund_amount", 0) > 0 and body["data"]["status"] == "delivered", body)
+        status, body, _ = api.call("POST", "/orders/{number}/returns/", token=access, number=order.number,
+                                   body={"reason": "damaged", "items": [{"item_id": free["item_id"], "quantity": free["quantity"] + 1}]})
+        ok("asking for more units than are free -> 400", status == 400 and "can still be returned" in body["error"], body)
+        status, body, _ = api.call("POST", "/orders/{number}/returns/{id}/cancel/", token=access, number=order.number, id=asked.get("id", 0))
+        ok("POST /orders/{number}/returns/{id}/cancel/ -> 200, the request is cancelled and its units are free again",
+           status == 200 and body["data"]["returns"]["requests"][0]["status"] == "cancelled" and body["data"]["returns"]["can_request"] is True, body)
+        status, body, _ = api.call("POST", "/orders/{number}/returns/{id}/cancel/", token=access, number=order.number, id=asked.get("id", 0))
+        ok("cancelling it again -> 400", status == 400, body)
         status, body, _ = api.call("GET", "products/reviews/", token=access, query=f"product_id={first['id']}")
         ok("can_review is true after delivery", status == 200 and body["data"]["can_review"] is True and body["data"]["review_status"] == "can_review" and body["data"]["order_id"] is None, body)
         status, body, _ = api.call("POST", "products/reviews/", token=access, fields=[("product_id", first["id"]), ("rating", 4), ("comment", "Good product.")],

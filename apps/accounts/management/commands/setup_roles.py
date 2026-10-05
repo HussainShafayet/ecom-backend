@@ -35,6 +35,10 @@ ORDER_MANAGER = {
         "orderitem": ("view",),  # read-only inline
         "orderstatushistory": ("view",),  # read-only inline
     },
+    "returns": {
+        "returnrequest": ("view", "change"),  # answer it; add/delete stays blocked (the customer makes it)
+        "returnitem": ("view", "change"),  # the inline where they enter what came back (good / damaged); add/delete stay blocked
+    },
     "payments": {"payment": ("view",)},  # a read-only ledger otherwise
     "reviews": {
         "review": ("view", "change", "delete"),  # change = approve/hide, delete = spam removal
