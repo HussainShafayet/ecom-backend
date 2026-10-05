@@ -53,15 +53,12 @@ picked up: item 3's per-event `NotificationSettings` toggle is exactly the mecha
 front of (a plan would just narrow *which* toggles a shop is allowed to turn on), so today's work here is not
 wasted by waiting.
 
-## Small frontend cleanup (offered, not yet done)
+## Small frontend cleanup (done)
 
-Nothing here is a missing feature — it's dead code worth removing in a small dedicated PR:
-- `ecom/src/context/CartContext.js` — an unused, standalone cart implementation (the real cart is `cartSlice.js`).
-- The dead route `/products/category/:category` (nothing links to it) and the dead `/deals` link in the old
-  announcement bar (replaced by the real announcement bar in step 13).
-- ~28 blocks of commented-out code scattered through the frontend (an old `WishList` implementation, disabled
-  middlewares, etc.).
-- `checkoutSlice`'s dead credit-card fields (`cvv`, `expiryDate`) — there is no card payment method yet.
+Dead code that was listed here has been removed from `../ecom` (the dead-code cleanup PR): the unused `CartContext`, the dead
+route `/products/category/:category`, the dead `/deals` link, `checkoutSlice`'s card fields (`cvv`, `expiryDate`) and almost all
+of the commented-out blocks. What is left is a few commented-out lines in `ecom/src/pages/Categories.js` (an old loader and
+error branch), not worth a PR of their own.
 
 ## A note on user roles
 
