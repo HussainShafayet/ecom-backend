@@ -79,14 +79,15 @@ def _lock_variants(variant_ids, with_details=False):
     return {variant.pk: variant for variant in variants.filter(pk__in=variant_ids).order_by("pk")}
 
 
-def _shift_stock(quantities, direction):
+def _shift_stock(quantities, direction, field="stock_quantity"):
     """Take (direction=-1) or return (+1) {variant_id: quantity} in ONE statement. The rows are already locked; the
-    CHECK (stock_quantity >= 0) of the column is the backstop should a bug ever let the same unit be sold twice."""
+    CHECK (stock_quantity >= 0) of the column is the backstop should a bug ever let the same unit be sold twice.
+    `field` is the counter that moves: the stock, or (for a damaged return) `damaged_quantity`."""
     change = Case(
         *[When(pk=pk, then=Value(quantity)) for pk, quantity in quantities.items()], output_field=IntegerField()
     )
-    stock = F("stock_quantity") + change if direction > 0 else F("stock_quantity") - change
-    ProductVariant.objects.filter(pk__in=quantities).update(stock_quantity=stock, updated_at=timezone.now())
+    moved = F(field) + change if direction > 0 else F(field) - change
+    ProductVariant.objects.filter(pk__in=quantities).update(**{field: moved, "updated_at": timezone.now()})
 
 
 def _shift_total_orders(product_ids, direction):
@@ -269,6 +270,24 @@ def _restock(order):
         _lock_variants(quantities)
         _shift_stock(quantities, +1)
     _shift_total_orders((item.product_id for item in items if item.product_id is not None), -1)
+
+
+def take_back_stock(good=None, damaged=None):
+    """Goods a customer sent back and the shop has now received (the returns app calls this, inside its own transaction). `good` is
+    `{variant_id: units}` that go back on the shelf; `damaged` is `{variant_id: units}` that can not be sold again: they are only counted in
+    the variant's `damaged_quantity`, never added to the stock. The variants are locked in pk order like every other stock writer. Returns
+    the variant ids that no longer exist (deleted from the catalog since the order): there is nothing to put those units back to."""
+    good = {pk: units for pk, units in (good or {}).items() if units > 0}
+    damaged = {pk: units for pk, units in (damaged or {}).items() if units > 0}
+    wanted = set(good) | set(damaged)
+    if not wanted:
+        return set()
+    existing = set(_lock_variants(wanted))
+    if existing & set(good):
+        _shift_stock({pk: units for pk, units in good.items() if pk in existing}, +1)
+    if existing & set(damaged):
+        _shift_stock({pk: units for pk, units in damaged.items() if pk in existing}, +1, field="damaged_quantity")
+    return wanted - existing
 
 
 # --- what a customer sees of their orders --------------------------------------------------------------------

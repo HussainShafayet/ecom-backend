@@ -26,6 +26,8 @@ ORDER_MANAGER = {
     "orders.view_order", "orders.change_order",
     "orders.view_orderitem",
     "orders.view_orderstatushistory",
+    "returns.view_returnrequest", "returns.change_returnrequest",
+    "returns.view_returnitem", "returns.change_returnitem",
     "payments.view_payment",
     "reviews.view_review", "reviews.change_review", "reviews.delete_review",
     "reviews.view_reviewmedia", "reviews.delete_reviewmedia",
@@ -36,6 +38,7 @@ ORDER_MANAGER = {
 # The highest-risk over-grants: things a role must NOT be able to do.
 CATALOG_MANAGER_MUST_NOT_HAVE = {
     "orders.change_order", "orders.add_order", "orders.delete_order",
+    "returns.view_returnrequest", "returns.change_returnrequest",
     "payments.view_payment",
     "accounts.view_user", "accounts.change_user",
     "siteconfig.change_sitesettings", "siteconfig.change_contactmessage",
@@ -45,6 +48,8 @@ ORDER_MANAGER_MUST_NOT_HAVE = {
     "catalog.change_product", "catalog.delete_product",
     "content.add_contentitem",
     "orders.add_order", "orders.delete_order", "orders.change_deliverycharge",
+    "returns.add_returnrequest", "returns.delete_returnrequest", "returns.change_returnsettings",
+    "returns.add_returnitem", "returns.delete_returnitem",
     "siteconfig.change_sitesettings", "siteconfig.delete_contactmessage",
     "accounts.change_user", "accounts.add_user", "accounts.delete_user",
     "addresses.view_address",

@@ -13,6 +13,7 @@ urlpatterns = [
     path("", include("apps.catalog.urls")),  # /products/…, /content/shop/
     path("", include("apps.content.urls")),  # /content/pages/<page>/
     path("", include("apps.orders.urls")),  # /orders/, /content/checkout/
+    path("", include("apps.returns.urls")),  # /orders/<number>/returns/
     path("", include("apps.reviews.urls")),  # /products/reviews/
     path("", include("apps.siteconfig.urls")),  # /site/…
     path("", include("apps.coupons.urls")),  # /coupons/validate/

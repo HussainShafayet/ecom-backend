@@ -1587,6 +1587,125 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/orders/{number}/returns/:
+    post:
+      operationId: orders_returns_create
+      description: 'Only the customer''s own order, only once it is delivered and
+        while the shop''s return period (Admin > Returns > Return settings, 7 days
+        by default, counted from the delivery) is open. `items` are lines of the order
+        (`items[].id`) with the number of units to send back; units that an earlier
+        request still holds are not free. Every problem comes back together as a 400
+        with `errors: [sentence, ...]`, and nothing is written. Answers with the order,
+        whose `returns` block now lists the request. The shop pays the money back
+        by hand once it has the goods.'
+      summary: Ask to return items of a delivered order
+      parameters:
+      - in: path
+        name: number
+        schema:
+          type: string
+        required: true
+      tags:
+      - orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReturnRequestInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReturnRequestInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReturnRequestInputRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OrderDetail'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/orders/{number}/returns/{request_id}/cancel/:
+    post:
+      operationId: orders_returns_cancel_create
+      description: 'A request that was already approved, rejected, completed or cancelled
+        is a 400: please contact the shop. Answers with the order.'
+      summary: Cancel my return request (only until the shop has answered it)
+      parameters:
+      - in: path
+        name: number
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: request_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OrderDetail'
+          description: ''
+        4XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        5XX:
+          description: Error envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/orders/track/:
     get:
       operationId: orders_track_retrieve
@@ -3911,6 +4030,12 @@ components:
           readOnly: true
           description: '`{earliest, latest}` dates while the order is on its way and
             the shop made an estimate, else null.'
+        returns:
+          allOf:
+          - $ref: '#/components/schemas/OrderReturns'
+          nullable: true
+          readOnly: true
+          description: null when the shop has no return requests feature installed.
       required:
       - can_cancel
       - coupon_code
@@ -3924,6 +4049,7 @@ components:
       - order_id
       - payment
       - phone_number
+      - returns
       - shipping_address
       - shipping_type
       - status_display
@@ -3933,8 +4059,12 @@ components:
       type: object
       description: |-
         One line, as it was bought (the snapshot), plus the product's current picture and slug for the link. `product_id` and
-        `variant_id` say what to put in a cart to buy it again (null when that product or variant has been deleted since).
+        `variant_id` say what to put in a cart to buy it again (null when that product or variant has been deleted since); `id` names
+        the line when part of the order is to be returned.
       properties:
+        id:
+          type: integer
+          readOnly: true
         product_id:
           type: integer
           nullable: true
@@ -3989,6 +4119,7 @@ components:
           description: Absolute URL of the product's main image, or null.
       required:
       - base_price
+      - id
       - image
       - line_total
       - product_id
@@ -4138,6 +4269,57 @@ components:
       - status
       - subtotal
       - total
+    OrderReturns:
+      type: object
+      description: Documentation of the `returns` block (its source is the returns
+        app, see `orders/hooks.py`).
+      properties:
+        can_request:
+          type: boolean
+          description: True when the order is delivered, the shop takes returns, the
+            return period is open and something is left to return.
+        message:
+          type: string
+          nullable: true
+          description: Why a delivered order can not be returned now (null otherwise,
+            or while it can).
+        until:
+          type: string
+          format: date
+          nullable: true
+          description: The last day a return may be asked for (delivered orders only).
+        return_charge:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: What a reason that is not `free` costs the customer (the order's
+            delivery charge), taken off the refund; 0 when the shop charges nothing.
+        reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnReason'
+          description: What the customer chooses from.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnableItem'
+          description: 'The lines (and units) that may be returned: empty unless `can_request`.'
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnRequest'
+          description: The customer's requests for this order, newest first.
+      required:
+      - can_request
+      - items
+      - message
+      - reasons
+      - requests
+      - return_charge
+      - until
     OrderStep:
       type: object
       description: |-
@@ -4937,6 +5119,22 @@ components:
         profile_picture:
           type: string
           format: binary
+    ReasonEnum:
+      enum:
+      - damaged
+      - wrong_item
+      - not_as_described
+      - size_fit
+      - changed_mind
+      - other
+      type: string
+      description: |-
+        * `damaged` - It arrived damaged
+        * `wrong_item` - I got the wrong item
+        * `not_as_described` - It is not as described
+        * `size_fit` - The size or fit is wrong
+        * `changed_mind` - I changed my mind
+        * `other` - Something else
     RefreshRequest:
       type: object
       properties:
@@ -4976,6 +5174,166 @@ components:
           maxLength: 200
       required:
       - token
+    ReturnItemInputRequest:
+      type: object
+      properties:
+        item_id:
+          type: integer
+          minimum: 1
+          description: '`items[].id` of the order.'
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+      required:
+      - item_id
+      - quantity
+    ReturnReason:
+      type: object
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+        free:
+          type: boolean
+          description: True when sending the goods back for this reason costs the
+            customer nothing.
+      required:
+      - free
+      - label
+      - value
+    ReturnRequest:
+      type: object
+      description: Documentation of one entry of `returns.requests` (its source is
+        the returns app, see `orders/hooks.py`).
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+          description: requested | approved | received | rejected | completed | cancelled
+        status_display:
+          type: string
+        reason:
+          type: string
+          description: damaged | wrong_item | not_as_described | size_fit | changed_mind
+            | other
+        reason_display:
+          type: string
+        details:
+          type: string
+          description: What the customer wrote; "" when nothing.
+        response:
+          type: string
+          description: The shop's message to the customer; "" until it has written
+            one.
+        goods_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: The price of the returned lines, less their share of the coupon.
+        return_charge:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: What the customer pays of the courier cost, taken off the refund
+            (0 = free return).
+        refund_amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: 'What is paid back: the goods less the return charge. An estimate
+            until the request is completed.'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnRequestItem'
+      required:
+      - created_at
+      - details
+      - goods_amount
+      - id
+      - items
+      - reason
+      - reason_display
+      - refund_amount
+      - response
+      - return_charge
+      - status
+      - status_display
+      - updated_at
+    ReturnRequestInputRequest:
+      type: object
+      description: The body of `POST /orders/{order_id}/returns/`.
+      properties:
+        reason:
+          $ref: '#/components/schemas/ReasonEnum'
+        details:
+          type: string
+          default: ''
+          description: Required when the reason is `other`.
+          maxLength: 500
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnItemInputRequest'
+          description: Each line of the order once.
+          maxItems: 50
+      required:
+      - items
+      - reason
+    ReturnRequestItem:
+      type: object
+      properties:
+        item_id:
+          type: integer
+        product_name:
+          type: string
+        variant_label:
+          type: string
+        unit_price:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        quantity:
+          type: integer
+      required:
+      - item_id
+      - product_name
+      - quantity
+      - unit_price
+      - variant_label
+    ReturnableItem:
+      type: object
+      properties:
+        item_id:
+          type: integer
+          description: '`items[].id` of the order.'
+        quantity:
+          type: integer
+          description: Units of that line that may still be returned.
+      required:
+      - item_id
+      - quantity
     Review:
       type: object
       properties:

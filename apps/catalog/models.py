@@ -296,6 +296,9 @@ class ProductVariant(Timestamped):
         null=True, blank=True, help_text="Final price of this variant. Empty = apply the product's discount."
     )
     stock_quantity = models.PositiveIntegerField(default=0)  # PositiveIntegerField adds CHECK (stock_quantity >= 0)
+    # Units that came back from a customer in a state that can not be sold again. Not part of the stock: only counted, so the shop knows what
+    # it lost. Moved only by `orders.services.take_back_stock` (the returns app); read-only in the admin.
+    damaged_quantity = models.PositiveIntegerField(default=0)
     is_default = models.BooleanField(default=False, help_text="The variant the shop picks when none is chosen.")
     is_active = models.BooleanField(default=True)
 

@@ -9,7 +9,7 @@ from apps.cart.services import MAX_QUANTITY
 from apps.catalog.serializers import absolute_url
 
 from .models import Order, OrderItem, OrderStatusHistory
-from . import services
+from . import hooks, services
 from .services import PAYMENT_TYPES
 
 MONEY = {"max_digits": 12, "decimal_places": 2}
@@ -110,7 +110,8 @@ class OrderPlacedSerializer(serializers.Serializer):
 # --- reading an order (a customer's own, or a guest's tracking) ---------------------------------------------------
 class OrderItemSerializer(serializers.ModelSerializer):
     """One line, as it was bought (the snapshot), plus the product's current picture and slug for the link. `product_id` and
-    `variant_id` say what to put in a cart to buy it again (null when that product or variant has been deleted since)."""
+    `variant_id` say what to put in a cart to buy it again (null when that product or variant has been deleted since); `id` names
+    the line when part of the order is to be returned."""
 
     product_slug = serializers.SerializerMethodField(help_text="null when the product has been deleted since.")
     image = serializers.SerializerMethodField(help_text="Absolute URL of the product's main image, or null.")
@@ -118,6 +119,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = (
+            "id",
             "product_id",
             "variant_id",
             "product_slug",
@@ -164,6 +166,61 @@ class OrderPaymentSerializer(serializers.Serializer):
     refunded_at = serializers.DateTimeField(allow_null=True)
 
 
+class ReturnReasonSerializer(serializers.Serializer):
+    value = serializers.CharField()
+    label = serializers.CharField()
+    free = serializers.BooleanField(help_text="True when sending the goods back for this reason costs the customer nothing.")
+
+
+class ReturnableItemSerializer(serializers.Serializer):
+    item_id = serializers.IntegerField(help_text="`items[].id` of the order.")
+    quantity = serializers.IntegerField(help_text="Units of that line that may still be returned.")
+
+
+class ReturnRequestItemSerializer(serializers.Serializer):
+    item_id = serializers.IntegerField()
+    product_name = serializers.CharField()
+    variant_label = serializers.CharField()
+    unit_price = serializers.DecimalField(**MONEY)
+    quantity = serializers.IntegerField()
+
+
+class ReturnRequestSerializer(serializers.Serializer):
+    """Documentation of one entry of `returns.requests` (its source is the returns app, see `orders/hooks.py`)."""
+
+    id = serializers.IntegerField()
+    status = serializers.CharField(help_text="requested | approved | received | rejected | completed | cancelled")
+    status_display = serializers.CharField()
+    reason = serializers.CharField(help_text="damaged | wrong_item | not_as_described | size_fit | changed_mind | other")
+    reason_display = serializers.CharField()
+    details = serializers.CharField(help_text='What the customer wrote; "" when nothing.')
+    response = serializers.CharField(help_text='The shop\'s message to the customer; "" until it has written one.')
+    goods_amount = serializers.DecimalField(**MONEY, help_text="The price of the returned lines, less their share of the coupon.")
+    return_charge = serializers.DecimalField(**MONEY, help_text="What the customer pays of the courier cost, taken off the refund (0 = free return).")
+    refund_amount = serializers.DecimalField(**MONEY, help_text="What is paid back: the goods less the return charge. An estimate until the request is completed.")
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+    items = ReturnRequestItemSerializer(many=True)
+
+
+class OrderReturnsSerializer(serializers.Serializer):
+    """Documentation of the `returns` block (its source is the returns app, see `orders/hooks.py`)."""
+
+    can_request = serializers.BooleanField(
+        help_text="True when the order is delivered, the shop takes returns, the return period is open and something is left to return."
+    )
+    message = serializers.CharField(
+        allow_null=True, help_text="Why a delivered order can not be returned now (null otherwise, or while it can)."
+    )
+    until = serializers.DateField(allow_null=True, help_text="The last day a return may be asked for (delivered orders only).")
+    return_charge = serializers.DecimalField(
+        **MONEY, help_text="What a reason that is not `free` costs the customer (the order's delivery charge), taken off the refund; 0 when the shop charges nothing."
+    )
+    reasons = ReturnReasonSerializer(many=True, help_text="What the customer chooses from.")
+    items = ReturnableItemSerializer(many=True, help_text="The lines (and units) that may be returned: empty unless `can_request`.")
+    requests = ReturnRequestSerializer(many=True, help_text="The customer's requests for this order, newest first.")
+
+
 class OrderSummarySerializer(serializers.ModelSerializer):
     """A row of the customer's order list."""
 
@@ -194,6 +251,7 @@ class OrderDetailSerializer(OrderSummarySerializer):
     expected_delivery = serializers.SerializerMethodField(
         help_text="`{earliest, latest}` dates while the order is on its way and the shop made an estimate, else null."
     )
+    returns = serializers.SerializerMethodField(help_text="null when the shop has no return requests feature installed.")
 
     class Meta(OrderSummarySerializer.Meta):
         fields = OrderSummarySerializer.Meta.fields + (
@@ -214,11 +272,16 @@ class OrderDetailSerializer(OrderSummarySerializer):
             "history",
             "can_cancel",
             "expected_delivery",
+            "returns",
         )
 
     @extend_schema_field(OrderPaymentSerializer(allow_null=True))
     def get_payment(self, order):
         return self.context.get("payments", {}).get(order.pk)
+
+    @extend_schema_field(OrderReturnsSerializer(allow_null=True))
+    def get_returns(self, order):
+        return hooks.returns_info(order)
 
     @extend_schema_field(OrderStepSerializer(many=True))
     def get_history(self, order):

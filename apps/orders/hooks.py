@@ -3,9 +3,12 @@
 `orders` never imports `payments` (the payments app listens to the order signals and depends on orders, not the other
 way round). The payments app registers a provider from its `AppConfig.ready()`; until it exists an order shows no
 payment.
+
+The same goes for the `returns` block of an order (the customer's return requests, see `apps/returns`).
 """
 
 _providers = []
+_returns_providers = []
 
 
 def register_payment_info_provider(provider):
@@ -23,3 +26,18 @@ def payment_info(orders):
         for provider in _providers:
             found.update(provider(orders))
     return found
+
+
+def register_returns_provider(provider):
+    """`provider(order)` returns the `returns` block of one order (a dict), or None when it has nothing to say."""
+    if provider not in _returns_providers:
+        _returns_providers.append(provider)
+
+
+def returns_info(order):
+    """The `returns` block of this order from the returns app, or None when that app is not installed."""
+    for provider in _returns_providers:
+        block = provider(order)
+        if block is not None:
+            return block
+    return None

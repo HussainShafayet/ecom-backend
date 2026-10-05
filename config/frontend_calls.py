@@ -38,6 +38,8 @@ FRONTEND_CALLS = [
     ("GET", "/orders/"),
     ("GET", "/orders/{number}/"),
     ("POST", "/orders/{number}/cancel/"),
+    ("POST", "/orders/{number}/returns/"),
+    ("POST", "/orders/{number}/returns/{id}/cancel/"),
     ("GET", "/orders/track/"),
     # the shop's identity, pages, FAQ, contact form and newsletter (services/siteService.js)
     ("GET", "/site/"),
