@@ -1,7 +1,7 @@
 """The two staff Groups and what each may touch in the admin. Never add a permission here that a ModelAdmin already
 blocks with has_add_permission/has_change_permission/has_delete_permission (Order/DeliveryCharge add+delete,
-Payment add+change+delete, PageContent add+delete, ContactMessage add): the block is the belt, this file is the
-suspenders, and a permission granted "just in case" would fail open instead of closed if the block is ever loosened."""
+Payment add+change+delete, PageContent add+delete, ContactMessage add, StockMovement add+change+delete): the block is the
+belt, this file is the suspenders, and a permission granted "just in case" would fail open instead of closed if the block is ever loosened."""
 from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -18,6 +18,7 @@ CATALOG_MANAGER = {
         "productvariant": ("view", "add", "change", "delete"),
         "productmedia": ("view", "add", "change", "delete"),
         "flashsale": ("view", "change"),  # the one window; add/delete stays blocked
+        "stockmovement": ("view",),  # the stock history, read-only
     },
     "content": {
         "pagecontent": ("view", "change"),  # the six pages are fixed; add/delete stays blocked

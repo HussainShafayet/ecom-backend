@@ -42,8 +42,11 @@ def test_the_number_is_taken_after_everything_else_is_written(api_client):
     statements = [q["sql"] for q in context.captured_queries]
     counter_lock = next(i for i, sql in enumerate(statements) if 'FROM "orders_ordersequence"' in sql and "FOR" in sql)
     after = [sql for sql in statements[counter_lock + 1 :] if not sql.startswith(("SAVEPOINT", "RELEASE"))]
-    assert len(after) == 2  # bump the counter, store the number on the order: nothing else waits behind the lock
+    # bump the counter, store the number on the order, write the stock history lines (they carry the number, so they can not come
+    # earlier; ONE insert however many lines): nothing else waits behind the lock
+    assert len(after) == 3
     assert after[0].startswith('UPDATE "orders_ordersequence"') and after[1].startswith('UPDATE "orders_order"')
+    assert after[2].startswith('INSERT INTO "catalog_stockmovement"')
 
 
 def test_cancelling_locks_the_order_then_the_variants_then_the_products_then_the_payment():

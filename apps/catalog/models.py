@@ -340,15 +340,33 @@ class ProductVariant(Timestamped):
                 raise ValidationError({"discount_price": message})
 
     def save(self, *args, **kwargs):
+        from . import stock  # stock.py imports this module
+
         if not self.sku:
             self.sku = self._derive_sku()
+        update_fields = kwargs.get("update_fields")
+        writes_stock = "stock_quantity" not in self.get_deferred_fields() and (
+            update_fields is None or "stock_quantity" in update_fields
+        )
         with transaction.atomic():
             others = ProductVariant.objects.filter(product_id=self.product_id).exclude(pk=self.pk)
             if self.is_default:
                 others.filter(is_default=True).update(is_default=False)  # exactly one default per product
             elif not others.filter(is_default=True).exists():
                 self.is_default = True  # the first variant of a product becomes its default
+            # Whatever a hand-edit does to the stock is measured against the row as it is NOW (locked, so an order can not slip in between),
+            # not against what the form showed, and goes into the stock history together with the save.
+            before = 0
+            if writes_stock and not self._state.adding:
+                locked = ProductVariant.objects.select_for_update(no_key=True).filter(pk=self.pk)
+                before = locked.values_list("stock_quantity", flat=True).first() or 0
             super().save(*args, **kwargs)
+            if writes_stock:
+                stock.record(
+                    [(self, self.stock_quantity - before, self.stock_quantity, 0)],
+                    StockMovement.Kind.MANUAL,
+                    by=getattr(self, "changed_by", None),
+                )
 
     def _derive_sku(self):
         parts = [self.product.sku, *(part.name for part in (self.color, self.size) if part is not None)]
@@ -358,6 +376,44 @@ class ProductVariant(Timestamped):
             counter += 1
             candidate = f"{base}-{counter}"
         return candidate
+
+
+class StockMovement(models.Model):
+    """One line of a variant's stock history: what moved its stock (or its damaged count), by how much, and what was left. Written only
+    through `stock.record`, in the same transaction as the move itself, so a rolled-back order leaves no line; never edited, never deleted
+    (the admin shows it read-only). `variant` is SET_NULL: a variant deleted from the catalog keeps its history under the SKU and name copied
+    here. The history starts when it was introduced: older stock has no lines, `stock_after` is what tells where a line stands."""
+
+    class Kind(models.TextChoices):
+        SALE = "sale", "Sold"
+        RESTOCK = "restock", "Order put back"  # cancelled, shipped parcel that came back, refunded before it was shipped
+        RETURN = "return", "Returned goods received"
+        MANUAL = "manual", "Changed by hand"
+
+    variant = models.ForeignKey(ProductVariant, null=True, on_delete=models.SET_NULL, related_name="stock_movements")
+    sku = models.CharField("SKU", max_length=100)
+    name = models.CharField(max_length=255, help_text="The product and variant as they were named then.")
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    change = models.IntegerField(help_text="Units added to (+) or taken from (-) the stock. 0 when only damaged units came back.")
+    damaged_change = models.PositiveIntegerField(
+        default=0, help_text="Units that came back damaged: counted, never added to the stock."
+    )
+    stock_after = models.PositiveIntegerField(help_text="What was in stock after this line.")
+    reference = models.CharField(max_length=60, blank=True, help_text="The order number, or the return request.")
+    by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["variant", "-created_at"], name="stockmove_variant_time")]
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(change=0) | Q(damaged_change__gt=0), name="stockmove_moves_something"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.sku} {self.change:+d} ({self.get_kind_display()})"
 
 
 class ProductMedia(FileCleanupModel, Timestamped):
