@@ -211,10 +211,11 @@ def staff_update(request, status=None, response=None, return_charge=None, refund
     return request
 
 
-def receive_goods(request, lines):
+def receive_goods(request, lines, by=None):
     """The goods are back: record, per line of the request, how many units came back fine and how many damaged (`lines`:
     `[{"item_id": <ReturnItem pk>, "good": n, "damaged": n}]`; a line left out came back with nothing), put the fine units back on the
-    shelf, count the damaged ones, and move the request to `received`. Under the request's row lock, once. Raises a 400 `ValidationError`
+    shelf, count the damaged ones, and move the request to `received`. Under the request's row lock, once. Each variant gets a line in the stock
+    history (`by` is the staff user who entered the numbers). Raises a 400 `ValidationError`
     naming every problem (nothing is written), `InvalidTransition` when the request is not `approved`.
 
     Returns `{"restocked": units, "damaged": units, "unplaced": [names]}`; `unplaced` are lines whose product variant was deleted from the
@@ -256,7 +257,9 @@ def receive_goods(request, lines):
                 continue
             good_by_variant[variant_id] += good
             damaged_by_variant[variant_id] += damaged
-        vanished = order_services.take_back_stock(good_by_variant, damaged_by_variant)
+        vanished = order_services.take_back_stock(
+            good_by_variant, damaged_by_variant, reference=f"Return #{locked.pk} of {locked.order.number}", by=by
+        )
         unplaced += [items[pk].order_item.product_name for pk in items if items[pk].order_item.variant_id in vanished]
 
         locked.status = ReturnRequest.Status.RECEIVED

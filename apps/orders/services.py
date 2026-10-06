@@ -12,7 +12,7 @@
   5. write the order, its lines (snapshots) and its first history row, take the stock, count the sale on each
      product, empty the customer's cart lines;
   6. take the order number LAST: the per-day counter row stays locked until the commit, so the less that happens
-     after it the better.
+     after it the better (the stock history lines, which carry the number, are the one INSERT that follows it).
 Lock order everywhere is variants (pk order), then the coupon, then products (pk order), then the day counter —
 `change_status`'s cancellation path (below) releases the coupon before it restocks, for the same reason.
 
@@ -35,7 +35,8 @@ from rest_framework.exceptions import APIException, NotFound, ValidationError
 from apps.addresses.models import Address
 from apps.cart.models import CartItem
 from apps.cart.services import active_variants_by_product, choose_variant, describe_variant
-from apps.catalog.models import Product, ProductVariant
+from apps.catalog import stock
+from apps.catalog.models import Product, ProductVariant, StockMovement
 from apps.catalog.pricing import variant_prices
 from apps.catalog.queries import main_images
 from apps.core.money import ZERO, quantize_money
@@ -230,6 +231,12 @@ def place_order(user=None, data=None):
         signals.order_placed.send(sender=Order, order=order)
         order.number = next_order_number()
         order.save(update_fields=["number"])
+        stock.record(
+            [(variant, -quantity, variant.stock_quantity - quantity, 0) for variant, quantity in lines],
+            StockMovement.Kind.SALE,
+            order.number,
+            by=user,
+        )
     return order
 
 
@@ -247,7 +254,7 @@ def change_status(order, new_status, by=None, note=""):
         if new_status == Order.Status.CANCELLED and locked.coupon_id:
             coupon_services.release_coupon_usage(locked.coupon_id)
         if state.restocks(old, new_status):
-            _restock(locked)
+            _restock(locked, by)
         locked.status = new_status
         locked.save(update_fields=["status", "updated_at"])
         OrderStatusHistory.objects.create(
@@ -258,35 +265,52 @@ def change_status(order, new_status, by=None, note=""):
     return order
 
 
-def _restock(order):
-    """Give the ordered quantities back and take the sale off each product's `total_orders`. A line whose variant or
-    product was deleted from the catalog since (the links are SET_NULL) has nothing to go back to."""
+def _restock(order, by=None):
+    """Give the ordered quantities back and take the sale off each product's `total_orders`, with a line in the stock history. A line
+    whose variant or product was deleted from the catalog since (the links are SET_NULL) has nothing to go back to."""
     items = list(order.items.all())
     quantities = defaultdict(int)
     for item in items:
         if item.variant_id is not None:
             quantities[item.variant_id] += item.quantity
     if quantities:
-        _lock_variants(quantities)
+        locked = _lock_variants(quantities, with_details=True)
         _shift_stock(quantities, +1)
+        stock.record(
+            [(locked[pk], quantities[pk], locked[pk].stock_quantity + quantities[pk], 0) for pk in sorted(locked)],
+            StockMovement.Kind.RESTOCK,
+            order.number,
+            by=by,
+        )
     _shift_total_orders((item.product_id for item in items if item.product_id is not None), -1)
 
 
-def take_back_stock(good=None, damaged=None):
+def take_back_stock(good=None, damaged=None, reference="", by=None):
     """Goods a customer sent back and the shop has now received (the returns app calls this, inside its own transaction). `good` is
     `{variant_id: units}` that go back on the shelf; `damaged` is `{variant_id: units}` that can not be sold again: they are only counted in
-    the variant's `damaged_quantity`, never added to the stock. The variants are locked in pk order like every other stock writer. Returns
-    the variant ids that no longer exist (deleted from the catalog since the order): there is nothing to put those units back to."""
+    the variant's `damaged_quantity`, never added to the stock. The variants are locked in pk order like every other stock writer. Each
+    variant gets one line in the stock history (`reference` names the return request, `by` is the staff user), damaged units included.
+    Returns the variant ids that no longer exist (deleted from the catalog since the order): there is nothing to put those units back to."""
     good = {pk: units for pk, units in (good or {}).items() if units > 0}
     damaged = {pk: units for pk, units in (damaged or {}).items() if units > 0}
     wanted = set(good) | set(damaged)
     if not wanted:
         return set()
-    existing = set(_lock_variants(wanted))
+    locked = _lock_variants(wanted, with_details=True)
+    existing = set(locked)
     if existing & set(good):
         _shift_stock({pk: units for pk, units in good.items() if pk in existing}, +1)
     if existing & set(damaged):
         _shift_stock({pk: units for pk, units in damaged.items() if pk in existing}, +1, field="damaged_quantity")
+    stock.record(
+        [
+            (variant, good.get(pk, 0), variant.stock_quantity + good.get(pk, 0), damaged.get(pk, 0))
+            for pk, variant in locked.items()
+        ],
+        StockMovement.Kind.RETURN,
+        reference,
+        by=by,
+    )
     return wanted - existing
 
 

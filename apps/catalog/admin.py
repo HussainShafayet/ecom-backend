@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
@@ -9,7 +10,7 @@ from django.utils.html import format_html
 
 from . import pricing, services
 from .flash_sale import flash_sale_state
-from .models import Brand, Category, Color, FlashSale, Product, ProductMedia, ProductVariant, Size, Tag
+from .models import Brand, Category, Color, FlashSale, Product, ProductMedia, ProductVariant, Size, StockMovement, Tag
 
 
 @admin.register(Category)
@@ -57,9 +58,29 @@ class SizeAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
+class ProductVariantForm(forms.ModelForm):
+    """The stock box keeps a hidden copy of what it showed when the page opened, so a save can tell a stock the person TYPED from the old
+    number they left in the box: orders keep taking stock while a product page is open, and the old number must not be written back."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["stock_quantity"].show_hidden_initial = True
+
+
 class ProductVariantFormSet(BaseInlineFormSet):
     """Cross-row rules the database would only reject with a 500 (NULL colour/size defeat the form-level
     unique check): no duplicate colour+size, one default, and every variant of a multi-variant product has options."""
+
+    def save_existing(self, form, obj, commit=True):
+        """Write back only what the person could have changed. The counters move while the page is open (an order takes stock, a return
+        counts damaged units), so the stock is written only when the person changed the box, and `damaged_quantity` (read-only here) never."""
+        if not commit:
+            return super().save_existing(form, obj, commit=commit)
+        left_alone = {"damaged_quantity"}
+        if "stock_quantity" not in form.changed_data:
+            left_alone.add("stock_quantity")
+        obj.save(update_fields=[field.name for field in obj._meta.concrete_fields if not field.primary_key and field.name not in left_alone])
+        return obj
 
     def clean(self):
         super().clean()
@@ -88,6 +109,7 @@ class ProductVariantFormSet(BaseInlineFormSet):
 
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
+    form = ProductVariantForm
     formset = ProductVariantFormSet
     fields = ("color", "size", "sku", "base_price", "discount_price", "stock_quantity", "damaged_quantity", "is_default", "is_active")
     readonly_fields = ("damaged_quantity",)  # counted when a damaged return is received, never typed
@@ -179,6 +201,12 @@ class ProductAdmin(admin.ModelAdmin):
         super().save_related(request, form, formsets, change)
         services.sync_primary_category(form.instance)
 
+    def save_formset(self, request, form, formset, change):
+        if formset.model is ProductVariant:
+            for variant_form in formset.forms:
+                variant_form.instance.changed_by = request.user  # the stock history names who typed the new stock
+        super().save_formset(request, form, formset, change)
+
     @admin.display(description="")
     def thumb(self, obj):
         image = next((media for media in obj.media.all() if media.thumbnail), None)
@@ -230,6 +258,28 @@ class FlashSaleAdmin(admin.ModelAdmin):
         return redirect(reverse("admin:catalog_flashsale_change", args=[FlashSale.load().pk]))
 
     def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(admin.ModelAdmin):
+    """The stock history, read-only: every line is written by the code that moves the stock, in the same transaction. Search by SKU,
+    product name or order number to follow one variant or one order."""
+
+    list_display = ("created_at", "sku", "name", "kind", "change", "damaged_change", "stock_after", "reference", "by")
+    list_filter = ("kind", "created_at")
+    list_select_related = ("by",)
+    search_fields = ("sku", "name", "reference")
+    date_hierarchy = "created_at"
+    ordering = ("-created_at", "-id")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
     def has_delete_permission(self, request, obj=None):

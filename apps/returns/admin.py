@@ -166,7 +166,7 @@ class ReturnRequestAdmin(admin.ModelAdmin):
 
     def _receive(self, request, obj, lines):
         try:
-            result = services.receive_goods(obj, lines)
+            result = services.receive_goods(obj, lines, by=request.user)
         except services.InvalidTransition as exc:
             self.message_user(request, f"Return #{obj.pk}: {exc} Reload the page.", messages.ERROR)
         except ApiValidationError as exc:

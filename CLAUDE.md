@@ -113,6 +113,15 @@ schema together, and never diverge from what the frontend calls without the user
   status is set to Received by `ReturnRequestAdmin.save_related`). The dashboard subtracts completed refunds in its own line ("Net revenue") and shows
   the shop-paid courier and the damaged units. The customer sees `response` (the shop's message). Order Manager may view/change requests and their
   lines (`setup_roles`); add/delete stay blocked.
+- Stock history: every move of a variant's stock leaves a `catalog.StockMovement` (signed `change`, `damaged_change` for returned units that are
+  only counted, `stock_after`, `kind`, `reference`, `by`), written ONLY through `catalog.stock.record`, in the same transaction as the move: `place_order`
+  (kind sold, after the order number is taken, because the line carries it), `_restock` (order put back), `take_back_stock` (returned goods, one line per
+  variant, damaged units included) and `ProductVariant.save` (a hand-edit or a new variant with stock: measured against the row locked at save time,
+  never against what the form showed; the admin sets `variant.changed_by`). The product page's variant formset (`ProductVariantFormSet.save_existing`)
+  writes the stock only when the person changed the box (the box keeps a hidden copy of what it showed, `show_hidden_initial`) and never
+  `damaged_quantity`, so a save does not undo an order or a return that landed while the page was open. `queryset.update()` / `bulk_create` send no `save`: a code path that moves stock
+  that way must call `record` itself. Lines are never edited or deleted (the admin is read-only, Catalog Manager may view); `variant` is SET_NULL with the
+  SKU and name copied. No backfill: stock from before has no lines. No API, no frontend.
 - Flash sale: products and categories are marked `is_flash_sale` in the catalog; the optional **window** that says when the
   mark counts is `catalog.FlashSale` (one row, `starts_at` / `ends_at`; none set = the mark counts always, as before).
   `catalog/flash_sale.py` (`flash_sale_state`, `is_live`) is the only code that reads it: `FlashSaleProductsView` adds
