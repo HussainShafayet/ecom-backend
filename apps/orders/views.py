@@ -1,3 +1,5 @@
+import re
+
 from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
 from rest_framework import serializers
 from rest_framework.permissions import SAFE_METHODS, AllowAny, IsAuthenticated
@@ -22,6 +24,20 @@ from .serializers import (
 )
 
 TAGS = ["orders"]
+
+# One random token per order the customer means to place (a UUID is right): 8 to 64 letters, digits and - _ . :
+IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9_.:-]{8,64}$")
+
+
+def idempotency_key(request):
+    """The `Idempotency-Key` header, or None when the request has none (placing an order then works as it always did). A key that is
+    not a plain token is a 400, so a mistake is heard of at once instead of silently turning the protection off."""
+    key = request.headers.get("Idempotency-Key")
+    if key is None:
+        return None
+    if not IDEMPOTENCY_KEY.match(key):
+        raise serializers.ValidationError("The Idempotency-Key header must be 8 to 64 letters, digits, - _ . or :.")
+    return key
 
 
 def signed_in_user(request):
@@ -85,15 +101,33 @@ class OrderListCreateView(APIView):
             "configured delivery charge. An optional `coupon_code` is redeemed against the server's own subtotal, "
             "never the client's. Every problem (unknown or hidden product, stock, minimum order quantity, a bad or "
             "expired coupon, ...) comes back together as a 400 with `errors: [sentence, ...]`, and nothing is "
-            "written. A signed-in customer's ordered lines leave their server cart."
+            "written. A signed-in customer's ordered lines leave their server cart.\n\n"
+            "**Safe to repeat**: send an `Idempotency-Key` header (one random token per order the customer means to place, "
+            "kept for retries of THAT order). The first request places the order (201); the same key again, from the same "
+            "customer, answers with that order (200) instead of placing a second one, also when two requests arrive at the "
+            "same moment. The same key with a different order is a 409; a malformed key is a 400; a refused order (400) does "
+            "not use the key up. Without the header nothing changes."
         ),
+        parameters=[
+            OpenApiParameter(
+                name="Idempotency-Key",
+                type=str,
+                location=OpenApiParameter.HEADER,
+                required=False,
+                description="8 to 64 letters, digits, - _ . or :. One per order the customer means to place.",
+            )
+        ],
         request=PlaceOrderSerializer,
-        responses={201: OrderPlacedSerializer},
+        responses={201: OrderPlacedSerializer, 200: OrderPlacedSerializer},
     )
     def post(self, request):
+        key = idempotency_key(request)
         serializer = PlaceOrderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        order = services.place_order(user=signed_in_user(request), data=serializer.validated_data)
+        if key is None:
+            order, replayed = services.place_order(user=signed_in_user(request), data=serializer.validated_data), False
+        else:
+            order, replayed = services.place_order_once(signed_in_user(request), serializer.validated_data, key)
         placed = {
             "order_id": order.number,
             "status": order.status,
@@ -105,6 +139,8 @@ class OrderListCreateView(APIView):
             "total": order.total,
             "expected_delivery": services.expected_delivery(order),
         }
+        if replayed:
+            return api_response(OrderPlacedSerializer(placed).data, message="Order already placed.", status=200)
         return api_response(OrderPlacedSerializer(placed).data, message="Order placed.", status=201)
 
 

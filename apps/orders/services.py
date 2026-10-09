@@ -22,11 +22,13 @@ cancels and retries is not blocked by their own cancelled attempt — and writes
 
 Both announce themselves through `signals.py` (inside their transaction) so the payments app can follow along.
 """
+import hashlib
+import json
 from collections import defaultdict
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Case, F, IntegerField, Value, When
 from django.db.models.functions import Greatest
 from django.utils import timezone
@@ -43,7 +45,7 @@ from apps.core.money import ZERO, quantize_money
 from apps.coupons import services as coupon_services
 
 from . import hooks, signals, state
-from .models import DeliveryCharge, Order, OrderItem, OrderSequence, OrderStatusHistory
+from .models import DeliveryCharge, Order, OrderItem, OrderRequestKey, OrderSequence, OrderStatusHistory
 
 # What the frontend calls the payment: its form sends "cash", its labels say "cod". Both are cash on delivery.
 PAYMENT_TYPES = {"cash": Order.PaymentMethod.COD, "cod": Order.PaymentMethod.COD}
@@ -238,6 +240,46 @@ def place_order(user=None, data=None):
             by=user,
         )
     return order
+
+
+class KeyReused(APIException):
+    """The `Idempotency-Key` was already used for a DIFFERENT order: answering it with the first one would hand the customer an order they did not
+    ask for, and placing the second one would defeat the key. A 409."""
+
+    status_code = 409
+    default_code = "idempotency_key_reused"
+    default_detail = "This Idempotency-Key was already used for a different order. Use a new key for a new order."
+
+
+def _fingerprint(data):
+    """A hash of what an order asks for (the validated body: the lines, the address, the coupon; whatever prices the client sent were dropped)."""
+    return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _lock_request_key(owner, key):
+    """Hold a database lock, until this transaction ends, on one (owner, key): a second request with the SAME key waits here until the first has
+    committed (then it finds its row) or rolled back (then it places the order itself). Requests with other keys do not wait for each other."""
+    digest = hashlib.sha256(f"{owner}|{key}".encode()).digest()
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_xact_lock(%s)", [int.from_bytes(digest[:8], "big", signed=True)])
+
+
+def place_order_once(user, data, key):
+    """`place_order`, safe to repeat under an `Idempotency-Key`. Returns `(order, replayed)`: `replayed` is True when this key had already placed an
+    order for this customer (nothing is placed again: no stock taken, no coupon used, no message sent), a `KeyReused` when it was used for another
+    order. See `OrderRequestKey`. The whole thing is one transaction, so a refused order (400) leaves no key behind."""
+    owner = f"user:{user.pk}" if user is not None else f"guest:{data['phone_number']}"
+    fingerprint = _fingerprint(data)
+    with transaction.atomic():
+        _lock_request_key(owner, key)
+        earlier = OrderRequestKey.objects.select_related("order__coupon").filter(key=key, owner=owner).first()
+        if earlier is not None:
+            if earlier.fingerprint != fingerprint:
+                raise KeyReused()
+            return earlier.order, True
+        order = place_order(user=user, data=data)
+        OrderRequestKey.objects.create(key=key, owner=owner, fingerprint=fingerprint, order=order)
+    return order, False
 
 
 # --- changing an order's status -------------------------------------------------------------------------------

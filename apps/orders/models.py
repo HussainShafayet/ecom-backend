@@ -175,3 +175,24 @@ class OrderStatusHistory(models.Model):
 
     def __str__(self):
         return f"{self.order_id}: {self.from_status or 'new'} -> {self.to_status}"
+
+
+class OrderRequestKey(models.Model):
+    """What makes placing an order safe to repeat. A checkout may send an `Idempotency-Key` (one random token per order the customer means to place):
+    the first request with that key places the order and leaves a row here; the same key again (a double tap, a retry after a lost answer) finds the row
+    and is answered with that order instead of placing a second one. The key counts only for its `owner` (the signed-in customer, or the guest's phone
+    number): somebody else's request with the same token is another order, and can not read this one. `fingerprint` is a hash of what was asked for, so
+    the same key with a different order is refused instead of silently answered with the first. A request that was refused (out of stock, a bad coupon)
+    leaves no row: the customer fixes it and sends the same key again. The row is small and kept with the order."""
+
+    key = models.CharField(max_length=64)
+    owner = models.CharField(max_length=40)
+    fingerprint = models.CharField(max_length=64)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="request_keys")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["key", "owner"], name="orderrequestkey_one_per_key_and_owner")]
+
+    def __str__(self):
+        return f"{self.key} ({self.owner}) -> order #{self.order_id}"
