@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from apps.core.utils import absolute_url  # noqa: F401  (also imported from here by other apps)
 
-from . import pricing
+from . import pricing, stock_notice
 from .models import Category, Product, ProductMedia
 
 MONEY = {"max_digits": 12, "decimal_places": 2}
@@ -37,6 +37,10 @@ class ProductListSerializer(serializers.ModelSerializer):
         source="has_options", read_only=True, help_text="True when the customer has to pick a colour or size."
     )
     variant_id = serializers.IntegerField(source="list_variant_id", read_only=True, allow_null=True)
+    stock_left = serializers.SerializerMethodField(
+        help_text='How many are left when only a few are ("Only 3 left"), else null. Only for a product without colours or sizes; '
+        "one with options has `stock_left` on each of its colours and sizes. The shop sets how few counts as a few (admin > Catalog > Stock notice)."
+    )
     is_favourite = serializers.SerializerMethodField()
 
     class Meta:
@@ -58,12 +62,25 @@ class ProductListSerializer(serializers.ModelSerializer):
             "total_reviews",
             "avg_rating",
             "availability_status",
+            "stock_left",
             "has_variants",
             "variant_id",
             "minimum_order_quantity",
             "is_favourite",
         )
         read_only_fields = fields
+
+    def _notice_at(self):
+        """The stock notice's threshold, read once for this serializer (a list's cards share one child serializer)."""
+        if "_notice_at_cache" not in self.__dict__:
+            self.__dict__["_notice_at_cache"] = stock_notice.threshold()
+        return self.__dict__["_notice_at_cache"]
+
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_stock_left(self, product):
+        if getattr(product, "has_options", True):  # a product with options says it on each colour and size
+            return None
+        return stock_notice.left_if_low(getattr(product, "list_stock", None), self._notice_at())
 
     @extend_schema_field(serializers.URLField(allow_null=True))
     def get_image(self, product):
@@ -114,6 +131,7 @@ class SizeOptionSerializer(serializers.Serializer):
     base_price = serializers.DecimalField(**MONEY)
     discount_price = serializers.DecimalField(**MONEY)
     availability_status = serializers.BooleanField()
+    stock_left = serializers.IntegerField(allow_null=True, help_text="How many of this size are left when only a few are, else null.")
 
 
 class ColorOptionSerializer(serializers.Serializer):
@@ -126,6 +144,7 @@ class ColorOptionSerializer(serializers.Serializer):
     base_price = serializers.DecimalField(required=False, **MONEY)
     discount_price = serializers.DecimalField(required=False, **MONEY)
     availability_status = serializers.BooleanField(required=False)
+    stock_left = serializers.IntegerField(required=False, allow_null=True, help_text="Only with `variant_id`: how many are left when only a few are.")
 
 
 def _media_entries(media, request):
@@ -139,7 +158,7 @@ def _media_entries(media, request):
     ]
 
 
-def _size_entry(variant):
+def _size_entry(variant, notice_at):
     base, final = pricing.variant_prices(variant)
     return {
         "name": variant.size.name,
@@ -147,15 +166,16 @@ def _size_entry(variant):
         "base_price": base,
         "discount_price": final,
         "availability_status": variant.stock_quantity > 0,
+        "stock_left": stock_notice.left_if_low(variant.stock_quantity, notice_at),
     }
 
 
-def _sorted_sizes(variants):
+def _sorted_sizes(variants, notice_at):
     ordered = sorted((v for v in variants if v.size_id is not None), key=lambda v: (v.size.sort_order, v.size.name, v.pk))
-    return [_size_entry(variant) for variant in ordered]
+    return [_size_entry(variant, notice_at) for variant in ordered]
 
 
-def build_options(product, request):
+def build_options(product, request, notice_at=0):
     """(colors, sizes, media_files) of a product from its prefetched `active_variants` and `media`.
 
     - some variants have a colour: `colors` (each with its sizes), `sizes` is empty and `media_files` is the shared
@@ -182,17 +202,21 @@ def build_options(product, request):
             "name": color.name,
             "hex_code": color.hex_code,
             "media_files": _media_entries(own_media or shared_media, request),
-            "sizes": _sorted_sizes(color_variants),
+            "sizes": _sorted_sizes(color_variants, notice_at),
         }
         plain = next((v for v in color_variants if v.size_id is None), None)
         if plain is not None:
             base, final = pricing.variant_prices(plain)
             entry.update(
-                variant_id=plain.pk, base_price=base, discount_price=final, availability_status=plain.stock_quantity > 0
+                variant_id=plain.pk,
+                base_price=base,
+                discount_price=final,
+                availability_status=plain.stock_quantity > 0,
+                stock_left=stock_notice.left_if_low(plain.stock_quantity, notice_at),
             )
         colors.append(entry)
 
-    sizes = [] if colors else _sorted_sizes(v for v in variants if v.color_id is None)
+    sizes = [] if colors else _sorted_sizes((v for v in variants if v.color_id is None), notice_at)
     return colors, sizes, _media_entries(shared_media if colors else media, request)
 
 
@@ -245,7 +269,7 @@ class ProductDetailSerializer(ProductListSerializer):
     def _options(self, product):
         cache = self.__dict__.setdefault("_options_cache", {})
         if product.pk not in cache:
-            cache[product.pk] = build_options(product, self.context.get("request"))
+            cache[product.pk] = build_options(product, self.context.get("request"), self._notice_at())
         return cache[product.pk]
 
     @extend_schema_field(NameSerializer(allow_null=True))

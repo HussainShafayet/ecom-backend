@@ -16,6 +16,7 @@ CATALOG_MANAGER = {
     "catalog.view_productvariant", "catalog.add_productvariant", "catalog.change_productvariant", "catalog.delete_productvariant",
     "catalog.view_productmedia", "catalog.add_productmedia", "catalog.change_productmedia", "catalog.delete_productmedia",
     "catalog.view_flashsale", "catalog.change_flashsale",
+    "catalog.view_stocknotice", "catalog.change_stocknotice",
     "catalog.view_stockmovement",
     "content.view_pagecontent", "content.change_pagecontent",
     "content.view_contentitem", "content.add_contentitem", "content.change_contentitem", "content.delete_contentitem",
@@ -40,6 +41,7 @@ ORDER_MANAGER = {
 CATALOG_MANAGER_MUST_NOT_HAVE = {
     "orders.change_order", "orders.add_order", "orders.delete_order",
     "catalog.add_stockmovement", "catalog.change_stockmovement", "catalog.delete_stockmovement",
+    "catalog.add_stocknotice", "catalog.delete_stocknotice",
     "returns.view_returnrequest", "returns.change_returnrequest",
     "payments.view_payment",
     "accounts.view_user", "accounts.change_user",
@@ -47,7 +49,7 @@ CATALOG_MANAGER_MUST_NOT_HAVE = {
     "siteconfig.delete_newslettersubscriber",
 }
 ORDER_MANAGER_MUST_NOT_HAVE = {
-    "catalog.change_product", "catalog.delete_product", "catalog.view_stockmovement",
+    "catalog.change_product", "catalog.delete_product", "catalog.view_stockmovement", "catalog.change_stocknotice",
     "content.add_contentitem",
     "orders.add_order", "orders.delete_order", "orders.change_deliverycharge",
     "returns.add_returnrequest", "returns.delete_returnrequest", "returns.change_returnsettings",

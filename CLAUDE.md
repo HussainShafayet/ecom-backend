@@ -128,6 +128,12 @@ schema together, and never diverge from what the frontend calls without the user
   `damaged_quantity`, so a save does not undo an order or a return that landed while the page was open. `queryset.update()` / `bulk_create` send no `save`: a code path that moves stock
   that way must call `record` itself. Lines are never edited or deleted (the admin is read-only, Catalog Manager may view); `variant` is SET_NULL with the
   SKU and name copied. No backfill: stock from before has no lines. No API, no frontend.
+- Stock notice ("Only N left"): `catalog.StockNotice` (one row, `show_when_left`, default 5, 0 = off; Catalog Manager may change it, add/delete
+  blocked) and `catalog/stock_notice.py` (`threshold`, `left_if_low`) are the only code that decide it. The product API answers `stock_left`
+  (the real number when 1..threshold are in stock, else null: never the real stock of a well-stocked product). A card says it only for a product
+  without options (`has_options` false; the stock comes from the `list_stock` annotation of `with_list_fields`, the same default variant the card's
+  price comes from); a product with options says it on each size and on a colour sold without a size, in `build_options`. The serializers read the
+  threshold once per response (`_notice_at`, one query), and reading never creates the row (`StockNotice.current()`; `load()` is for the admin).
 - Flash sale: products and categories are marked `is_flash_sale` in the catalog; the optional **window** that says when the
   mark counts is `catalog.FlashSale` (one row, `starts_at` / `ends_at`; none set = the mark counts always, as before).
   `catalog/flash_sale.py` (`flash_sale_state`, `is_live`) is the only code that reads it: `FlashSaleProductsView` adds

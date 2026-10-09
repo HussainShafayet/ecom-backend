@@ -137,7 +137,7 @@ def test_colors_hold_their_sizes_in_size_order(api_client, red, blue, sizes):
     assert first["hex_code"] == "#FF0000"
     assert [size["name"] for size in first["sizes"]] == ["S", "M", "L"]
     small_entry, medium_entry, large_entry = first["sizes"]
-    assert set(small_entry) == {"name", "variant_id", "base_price", "discount_price", "availability_status"}
+    assert set(small_entry) == {"name", "variant_id", "base_price", "discount_price", "availability_status", "stock_left"}
     assert small_entry["availability_status"] is False  # out of stock
     assert large_entry["availability_status"] is True
     assert (medium_entry["base_price"], medium_entry["discount_price"]) == (1200.0, 1080.0)  # own price, product rule
@@ -321,5 +321,5 @@ def test_detail_costs_the_same_queries_for_a_small_and_a_large_product(api_clien
 def test_detail_query_budget(api_client):
     product = make_product("P")
     build_variants(product, 3)
-    # product, variants, categories, media, tags, the view counter's UPDATE
-    assert count_queries(api_client, url("p")) <= 6
+    # product, variants, categories, media, tags, the view counter's UPDATE, the stock notice's setting
+    assert count_queries(api_client, url("p")) <= 7
