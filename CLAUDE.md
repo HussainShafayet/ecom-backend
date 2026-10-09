@@ -63,6 +63,12 @@ schema together, and never diverge from what the frontend calls without the user
 - The delivery estimate is the shipping type's `DeliveryCharge.min_days` / `max_days` (both empty = no promise, shown nowhere); `place_order`
   snapshots it as `Order.expected_from` / `expected_to` (calendar days from the order's day) and `services.expected_delivery(order)` is the only
   place that decides whether to show it (only while the order is on its way). `GET /orders/?status=` takes one status or a comma list.
+- Placing an order is safe to repeat: `POST /orders/` takes an optional `Idempotency-Key` header, and `orders.services.place_order_once(user, data, key)`
+  (one transaction) answers a repeat with the order the key already placed instead of placing another (`OrderRequestKey`: key, owner = the signed-in
+  user or the guest's phone, a hash of the order asked for, the order). A `pg_advisory_xact_lock` on (owner, key) makes two requests with the same
+  key take turns (the second finds the first's row, or places the order itself if the first was refused and rolled back). The same key for a
+  different order is `KeyReused` (409); a refused order leaves no row; without the header `place_order` runs as before. The key is checked in the view
+  (`idempotency_key`, 8-64 token characters, else 400) and `CORS_ALLOW_HEADERS` lists `idempotency-key`.
 - Customers read their orders through `orders.services.customer_orders / customer_order / tracked_order` and cancel only
   through `orders.services.cancel_order()` (pending only, under the order's row lock, via `change_status`). The order
   serializers never show the staff's history note or `changed_by`; the guest tracking view (`orders/track/`, public,

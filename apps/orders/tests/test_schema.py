@@ -54,7 +54,10 @@ def test_placing_an_order_documents_the_body_and_the_created_response(schema):
     assert set(item["properties"]) == {"product_id", "variant_id", "quantity"}  # no price: it is ignored
     assert set(item["required"]) == {"product_id", "quantity"}
 
-    assert "201" in post["responses"] and "200" not in post["responses"]
+    assert "201" in post["responses"]  # a new order; the 200 is the same order answered again under the same Idempotency-Key
+    assert "200" in post["responses"]
+    key = next(parameter for parameter in post["parameters"] if parameter["name"] == "Idempotency-Key")
+    assert key["in"] == "header" and not key.get("required", False)  # optional
     body = post["responses"]["201"]["content"]["application/json"]["schema"]
     assert body["required"] == ["success", "message", "data"]
     assert set(component(schema, "OrderPlaced")["properties"]) == {

@@ -1433,14 +1433,18 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
     post:
       operationId: orders_create
-      description: 'Prices and totals in the body are ignored: the server prices every
-        line from the catalog and adds the configured delivery charge. An optional
-        `coupon_code` is redeemed against the server''s own subtotal, never the client''s.
-        Every problem (unknown or hidden product, stock, minimum order quantity, a
-        bad or expired coupon, ...) comes back together as a 400 with `errors: [sentence,
-        ...]`, and nothing is written. A signed-in customer''s ordered lines leave
-        their server cart.'
+      description: |-
+        Prices and totals in the body are ignored: the server prices every line from the catalog and adds the configured delivery charge. An optional `coupon_code` is redeemed against the server's own subtotal, never the client's. Every problem (unknown or hidden product, stock, minimum order quantity, a bad or expired coupon, ...) comes back together as a 400 with `errors: [sentence, ...]`, and nothing is written. A signed-in customer's ordered lines leave their server cart.
+
+        **Safe to repeat**: send an `Idempotency-Key` header (one random token per order the customer means to place, kept for retries of THAT order). The first request places the order (201); the same key again, from the same customer, answers with that order (200) instead of placing a second one, also when two requests arrive at the same moment. The same key with a different order is a 409; a malformed key is a 400; a refused order (400) does not use the key up. Without the header nothing changes.
       summary: Place an order (guest or signed in)
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        description: 8 to 64 letters, digits, - _ . or :. One per order the customer
+          means to place.
       tags:
       - orders
       requestBody:
@@ -1460,6 +1464,25 @@ paths:
       - {}
       responses:
         '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - message
+                - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: '#/components/schemas/OrderPlaced'
+          description: ''
+        '200':
           content:
             application/json:
               schema:

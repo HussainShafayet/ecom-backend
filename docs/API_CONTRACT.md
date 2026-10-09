@@ -288,6 +288,17 @@ never linked to an account afterwards, not even to one with the same phone numbe
 `order`, `THROTTLE_ORDER`, default `30/hour`): per client IP for guests, per account for signed-in customers, failed
 attempts count too; over the limit is `429` with `Retry-After`.
 
+**Safe to repeat: the `Idempotency-Key` header** (optional). The checkout sends one random token per order the customer means to place
+(8 to 64 of letters, digits, `-` `_` `.` `:`; a UUID is right) and keeps it for retries of THAT order (a double tap, a retry after a lost
+answer). The first request places the order (`201`, as above); the same key again from the same customer answers with that order
+(`200`, `message: "Order already placed."`, the same `data`) and places nothing: no stock taken, no coupon used, no message sent. Two
+requests with the same key at the same moment place one order. The key belongs to its customer (the signed-in account, or the guest's phone
+number): somebody else's request with the same token is another order and can not read this one. The same key with a DIFFERENT order (other
+lines, address or coupon) is a `409` (`errors: ["This Idempotency-Key was already used for a different order. …"]`); a malformed key is a
+`400`. A refused order (`400`: out of stock, a bad coupon, …) does not use the key up, so the customer fixes the order and sends the same key
+again. Without the header nothing changes: every request places an order, as before. The storefront is another origin, so
+`CORS_ALLOW_HEADERS` lists `idempotency-key` (a browser's preflight asks for it).
+
 **Body rules.** `name` ≤ 150 chars, required. `email` optional (`""` and `null` are fine). `phone_number` is `+880` and 10
 digits. `shipping_type` is `inside_dhaka` (needs `shipping_area`) or `outside_dhaka` (needs `shipping_division`,
 `shipping_district`, `shipping_thana`); fields that do not apply are cleared, like in a saved address (section 3).
