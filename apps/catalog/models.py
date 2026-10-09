@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator, RegexValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
 from django.db.models import F, Q
 from django.db.models.functions import Lower
@@ -502,4 +502,41 @@ class FlashSale(models.Model):
 
     def save(self, *args, **kwargs):
         self.pk = FLASH_SALE_ID
+        super().save(*args, **kwargs)
+
+
+STOCK_NOTICE_ID = 1
+
+
+class StockNotice(models.Model):
+    """When the shop tells customers how few are left: one row (the admin opens it straight from the menu). A product, or a size of one, with
+    1 to `show_when_left` units in stock is shown as "Only 3 left" (the product API answers `stock_left`); with more, the number is never
+    given away. 0 switches it off. No row yet: the default (5) counts, and reading never writes. See `stock_notice.py`."""
+
+    show_when_left = models.PositiveSmallIntegerField(
+        default=5,
+        validators=[MaxValueValidator(1000)],
+        help_text='Show "Only N left" when 1 to this many units are in stock (the real number, so customers hurry). 0 switches it off.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "stock notice"
+        constraints = [models.CheckConstraint(condition=Q(id=STOCK_NOTICE_ID), name="catalog_one_stock_notice_row")]
+
+    def __str__(self):
+        return "Stock notice"
+
+    @classmethod
+    def load(cls):
+        """The row, created with the default if the shop has none yet (the admin uses this)."""
+        return cls.objects.get_or_create(pk=STOCK_NOTICE_ID)[0]
+
+    @classmethod
+    def current(cls):
+        """The row, or an unsaved one with the default: reading the setting never writes."""
+        return cls.objects.filter(pk=STOCK_NOTICE_ID).first() or cls()
+
+    def save(self, *args, **kwargs):
+        self.pk = STOCK_NOTICE_ID
         super().save(*args, **kwargs)

@@ -59,6 +59,7 @@ def with_list_fields(queryset):
         variant_base=Subquery(default_variant.values("base_price")[:1], output_field=MONEY),
         variant_discount=Subquery(default_variant.values("discount_price")[:1], output_field=MONEY),
         is_available=Exists(active_variants.filter(stock_quantity__gt=0)),
+        list_stock=Subquery(default_variant.values("stock_quantity")[:1]),  # the card's variant: what "Only N left" counts
         has_options=Exists(active_variants.filter(Q(color__isnull=False) | Q(size__isnull=False))),
         main_image=Subquery(main_image.values("file")[:1]),
         main_thumbnail=Subquery(main_image.values("thumbnail")[:1]),

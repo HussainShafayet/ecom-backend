@@ -168,7 +168,7 @@ search`. `ordering` ∈ `price, -price, discount_price, -discount_price, rating,
 
 **Product list item:** `id, name, slug, sku, image, base_price, discount_price, has_discount, discount_type
 ("percentage"|"fixed"), discount_value, brand_name, total_views, total_orders, total_reviews, avg_rating (number),
-availability_status (bool), has_variants (bool), variant_id, minimum_order_quantity, is_favourite`.
+availability_status (bool), stock_left (int|null), has_variants (bool), variant_id, minimum_order_quantity, is_favourite`.
 `discount_price` is always a number (equals `base_price` when there is no discount). `minimum_order_quantity` is the
 product's smallest order (1 unless the shop set more): an order below it is refused (section 6), so a cart line (which
 is a card too) can warn early.
@@ -178,8 +178,8 @@ tags[{name}], thumbnail, media_files[{file_type:"image"|"video", file_url, thumb
 short_description, long_description (sanitized HTML), model, weight, dimension{width,height,depth}, material, features,
 warranty_information, shipping_information, return_policy, qrcode_image_url` and variants:
 
-- colors: `colors:[{name, hex_code, variant_id?, base_price?, discount_price?, media_files[], sizes:[{name, variant_id, base_price, discount_price, availability_status}]}]`
-- no colors: `sizes:[{name, variant_id, base_price, discount_price, availability_status}]`
+- colors: `colors:[{name, hex_code, variant_id?, base_price?, discount_price?, availability_status?, stock_left?, media_files[], sizes:[{name, variant_id, base_price, discount_price, availability_status, stock_left}]}]`
+- no colors: `sizes:[{name, variant_id, base_price, discount_price, availability_status, stock_left}]`
 - Increments `total_views`.
 
 | Endpoint | `data` |
@@ -220,6 +220,12 @@ warranty_information, shipping_information, return_policy, qrcode_image_url` and
   nothing. The other lists, `GET /products/` included, are not affected: a product marked `is_flash_sale` still shows
   there and keeps its discount; ending the sale does not take a discount off, the admin does.
 - A page past the end is an empty `results` list, not a 404.
+- **"Only N left"** (`stock_left`): the real number of units, but only when 1 to the shop's threshold are in stock; with more, or
+  none, it is `null` (the real stock is never given away, and a sold-out product is `availability_status: false`, not "0 left").
+  The threshold is `catalog.StockNotice.show_when_left` (Admin > Catalog > Stock notice, one row, default 5, 0 = never say it; Catalog
+  Manager may change it). On a card it is the stock of the variant the card adds to the cart, and only for a product **without** colours or
+  sizes; a product with options (`has_variants`) has `stock_left: null` on its card and says it on each **size** of the detail page, and
+  on a **colour sold without a size** (`variant_id` on the colour). The detail's own `stock_left` follows the same rule as the card's.
 - **Detail** `colors` / `sizes` are **left out** (not `[]`) when they do not apply: the frontend tests `!product.colors`.
   Colours come with the default variant's colour first, sizes in size order. A colour sold without sizes has `sizes: []`
   and carries its own `variant_id`, `base_price`, `discount_price`, `availability_status`. Only active variants are

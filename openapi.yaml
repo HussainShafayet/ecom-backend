@@ -3141,6 +3141,14 @@ components:
         availability_status:
           type: boolean
           readOnly: true
+        stock_left:
+          type: integer
+          nullable: true
+          readOnly: true
+          description: How many are left when only a few are ("Only 3 left"), else
+            null. Only for a product without colours or sizes; one with options has
+            `stock_left` on each of its colours and sizes. The shop sets how few counts
+            as a few (admin > Catalog > Stock notice).
         has_variants:
           type: boolean
           readOnly: true
@@ -3191,6 +3199,7 @@ components:
       - size_name
       - sku
       - slug
+      - stock_left
       - total_orders
       - total_reviews
       - total_views
@@ -3323,6 +3332,11 @@ components:
           exclusiveMinimum: true
         availability_status:
           type: boolean
+        stock_left:
+          type: integer
+          nullable: true
+          description: 'Only with `variant_id`: how many are left when only a few
+            are.'
       required:
       - hex_code
       - media_files
@@ -4766,6 +4780,14 @@ components:
         availability_status:
           type: boolean
           readOnly: true
+        stock_left:
+          type: integer
+          nullable: true
+          readOnly: true
+          description: How many are left when only a few are ("Only 3 left"), else
+            null. Only for a product without colours or sizes; one with options has
+            `stock_left` on each of its colours and sizes. The shop sets how few counts
+            as a few (admin > Catalog > Stock notice).
         has_variants:
           type: boolean
           readOnly: true
@@ -4888,6 +4910,7 @@ components:
       - short_description
       - sku
       - slug
+      - stock_left
       - tags
       - thumbnail
       - total_orders
@@ -4976,6 +4999,14 @@ components:
         availability_status:
           type: boolean
           readOnly: true
+        stock_left:
+          type: integer
+          nullable: true
+          readOnly: true
+          description: How many are left when only a few are ("Only 3 left"), else
+            null. Only for a product without colours or sizes; one with options has
+            `stock_left` on each of its colours and sizes. The shop sets how few counts
+            as a few (admin > Catalog > Stock notice).
         has_variants:
           type: boolean
           readOnly: true
@@ -5007,6 +5038,7 @@ components:
       - name
       - sku
       - slug
+      - stock_left
       - total_orders
       - total_reviews
       - total_views
@@ -5601,11 +5633,16 @@ components:
           exclusiveMinimum: true
         availability_status:
           type: boolean
+        stock_left:
+          type: integer
+          nullable: true
+          description: How many of this size are left when only a few are, else null.
       required:
       - availability_status
       - base_price
       - discount_price
       - name
+      - stock_left
       - variant_id
     SocialLink:
       type: object

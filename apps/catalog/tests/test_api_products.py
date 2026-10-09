@@ -22,7 +22,7 @@ LIST = "/api/v1/products/"
 ITEM_KEYS = {
     "id", "name", "slug", "sku", "image", "base_price", "discount_price", "has_discount", "discount_type",
     "discount_value", "brand_name", "total_views", "total_orders", "total_reviews", "avg_rating",
-    "availability_status", "has_variants", "variant_id", "minimum_order_quantity", "is_favourite",
+    "availability_status", "stock_left", "has_variants", "variant_id", "minimum_order_quantity", "is_favourite",
 }  # fmt: skip
 
 
@@ -483,7 +483,7 @@ def test_curated_lists_stay_flat(api_client):
     small = count_queries(api_client, "/api/v1/products/featured/")
     for index in range(8):
         sellable(make_product(f"B{index}", is_featured=True))
-    assert count_queries(api_client, "/api/v1/products/featured/") == small == 2
+    assert count_queries(api_client, "/api/v1/products/featured/") == small == 3  # the products, the count, the stock notice's setting
 
 
 def test_a_card_says_the_smallest_quantity_the_shop_takes(api_client):

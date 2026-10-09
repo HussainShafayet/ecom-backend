@@ -10,7 +10,7 @@ from django.utils.html import format_html
 
 from . import pricing, services
 from .flash_sale import flash_sale_state
-from .models import Brand, Category, Color, FlashSale, Product, ProductMedia, ProductVariant, Size, StockMovement, Tag
+from .models import Brand, Category, Color, FlashSale, Product, ProductMedia, ProductVariant, Size, StockMovement, StockNotice, Tag
 
 
 @admin.register(Category)
@@ -256,6 +256,22 @@ class FlashSaleAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         return redirect(reverse("admin:catalog_flashsale_change", args=[FlashSale.load().pk]))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(StockNotice)
+class StockNoticeAdmin(admin.ModelAdmin):
+    """One row: the menu entry opens it directly. How few units left makes the shop say "Only 3 left" on a product (0 switches it off)."""
+
+    fields = ("show_when_left",)
+
+    def changelist_view(self, request, extra_context=None):
+        return redirect(reverse("admin:catalog_stocknotice_change", args=[StockNotice.load().pk]))
 
     def has_add_permission(self, request):
         return False
