@@ -39,7 +39,7 @@ Every push/PR to `main` runs `pytest` + schema validation in GitHub Actions (`.g
 
 ## Structure
 
-`config/settings/{base,dev,prod}.py` · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` ·
+`config/settings/{base,dev,prod}.py` (+ `test.py`, what pytest runs under: dev with `SENTRY_DSN` forced empty) · `config/api_urls.py` (everything under `/api/v1/`) · `config/frontend_calls.py` ·
 `scripts/` (`e2e_smoke.py`, `backup.sh`) · `.github/workflows/ci.yml` ·
 `apps/{core,accounts,addresses,catalog,content,siteconfig,wishlist,cart,orders,payments,reviews,notifications,coupons,returns,dashboard}` (built step by step) ·
 `docs/API_CONTRACT.md` · `docs/ROADMAP.md` (what's built vs. still missing, priority order) · `openapi.yaml`
@@ -155,7 +155,9 @@ schema together, and never diverge from what the frontend calls without the user
   something to register a menu entry on.
 - Error tracking: `SENTRY_DSN` is optional (empty = off, the default everywhere but a real deployment) —
   `config/settings/base.py` calls `sentry_sdk.init(send_default_pii=False)` only when it's set, so no phone
-  number, e-mail, IP or cookie ever leaves in a report. Unlike `OTP_BACKEND`, prod does not require it.
+  number, e-mail, IP or cookie ever leaves in a report. Unlike `OTP_BACKEND`, prod does not require it. pytest runs under
+  `config.settings.test`, which empties `SENTRY_DSN` before `.env` is read: a developer's `.env` may hold the live DSN, and a
+  test run must not send its provoked errors to the real project (CI's `DJANGO_SETTINGS_MODULE` is `dev`, which has no DSN).
 - Reviews: written only through `reviews.services.create_review()` / `update_review()` (needs a DELIVERED order of the
   customer containing the product; one per customer and product). The product's `total_reviews` / `avg_rating` are
   derived data: `refresh_product_rating()` recounts them from the approved reviews (locking the product row first),
